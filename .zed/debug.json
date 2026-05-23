@@ -1,0 +1,23 @@
+[
+  {
+    "label": "DAPLink Debug",
+    "adapter": "GDB",
+    "request": "launch",
+    "program": "build/debug/gd32f470_template.elf",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "initializeCommands": [
+      "target extended-remote :3333",
+      "monitor reset halt",
+      "load",
+    ],
+    "template": {
+      "program": "arm-none-eabi-gdb",
+      "args": [
+        "-q",
+        "-ex",
+        "target extended-remote :3333",
+        "build/debug/gd32f470_template.elf",
+      ],
+    },
+  },
+]

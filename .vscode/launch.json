@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+
+  "configurations": [
+    {
+      "name": "DAPLink Debug",
+
+      "type": "cortex-debug",
+
+      "request": "launch",
+
+      "cwd": "${workspaceFolder}",
+
+      "executable": "${workspaceFolder}/build/debug/gd32f470_template.elf",
+
+      "servertype": "openocd",
+
+      "configFiles": [
+        "openocd/interface-daplink.cfg",
+        "openocd/target-gd32f4xx.cfg",
+      ],
+
+      "runToEntryPoint": "main",
+
+      "device": "GD32F470",
+
+      "preLaunchTask": "Build Debug",
+    },
+  ],
+}

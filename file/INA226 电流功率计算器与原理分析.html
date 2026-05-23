@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>INA226 & 进制计算器</title>
+  <!-- Load Tailwind CSS from CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Load React and ReactDOM from CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Load Babel for JSX transformation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* Custom styles for better aesthetics, complementing Tailwind */
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .base-input {
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace; /* Monospace font for number inputs */
+    }
+  </style>
+</head>
+<body class="bg-gray-50 p-6">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // INA226 计算器组件
+    const INA226Calculator = () => {
+      const [rshunt, setRshunt] = useState('');
+      const [imax, setImax] = useState('');
+      const [vbus, setVbus] = useState('');
+      const [shunt, setShunt] = useState('');
+      const [calibration, setCalibration] = useState('');
+      const [actualCurrent, setActualCurrent] = useState('');
+      const [measuredCurrent, setMeasuredCurrent] = useState('');
+
+      const [result, setResult] = useState('');
+      const [reverseResult, setReverseResult] = useState('');
+
+      const calculateCurrent = () => {
+        const s = parseFloat(shunt);
+        const cal = parseFloat(calibration);
+        const rsh_mOhm = parseFloat(rshunt);
+        const imaxVal = parseFloat(imax);
+        const vbusVal = parseFloat(vbus);
+
+        if ([s, cal, rsh_mOhm, imaxVal, vbusVal].some(isNaN)) {
+          setResult('请输入所有有效数值！');
+          return;
+        }
+
+        const current_mA = (s * cal) / 2048;
+        const current_A = current_mA / 1000;
+        const power_W = current_A * vbusVal;
+
+        const rshunt_Ohm = rsh_mOhm / 1000;
+        const current_LSB = imaxVal / 32768;
+        const recommended_cal = 0.00512 / (current_LSB * rshunt_Ohm);
+
+        setResult(`
+          <strong>实际计算电流：</strong> ${current_A.toFixed(4)} A<br/>
+          <strong>功率估算：</strong> ${power_W.toFixed(2)} W<br/>
+          <strong>推荐 Current_LSB：</strong> ${current_LSB.toExponential(4)} A/bit<br/>
+          <strong>推荐 Calibration：</strong> ${Math.round(recommended_cal)}
+        `);
+      };
+
+      const reverseCalibration = () => {
+        const act = parseFloat(actualCurrent);
+        const meas = parseFloat(measuredCurrent);
+        const originalCal = parseFloat(calibration);
+
+        if ([act, meas, originalCal].some(isNaN) || meas === 0) {
+          setReverseResult('请输入有效的实际电流与测量数据！');
+          return;
+        }
+
+        const correctedCalibration = originalCal * (act / meas);
+
+        setReverseResult(`
+          <strong>修正后校准值：</strong> ${correctedCalibration.toFixed(2)}<br/>
+          说明：将校准寄存器从 ${originalCal} 修改为该值，可使测量值更贴近 ${act} A。
+        `);
+      };
+
+      return (
+        <div className="p-6 bg-white rounded-lg shadow-md font-inter">
+          <h1 className="text-3xl font-bold text-gray-800 mb-6">INA226 电流/功率计算器与原理分析</h1>
+
+          <h2 className="text-2xl font-semibold text-gray-700 mb-4">原理与公式推导</h2>
+          <div className="bg-gray-50 border border-gray-300 p-4 rounded-lg mb-8">
+            <h3 className="text-xl font-medium text-gray-800 mb-2">1. 电流计算</h3>
+            <p className="mb-1"><strong>Current (mA) = (Shunt Register × Calibration Register) / 2048</strong></p>
+            <p className="mb-1">Shunt 电压（V<sub>shunt</sub>） = Shunt Register × 2.5 μV</p>
+            <p className="mb-1">Current_LSB 建议选择：最大电流 / 32768</p>
+            <p className="mb-2">校准寄存器计算公式：<br/>
+            <strong>Calibration = 0.00512 / (Current_LSB × R<sub>shunt</sub>)</strong></p>
+
+            <h3 className="text-xl font-medium text-gray-800 mb-2">2. 总线电压计算</h3>
+            <p className="mb-1">Bus Voltage 寄存器每位表示 1.25 mV：</p>
+            <p className="mb-2"><strong>V<sub>bus</sub> = Bus Register × 1.25 mV</strong></p>
+            <p className="mb-1">最大可表示电压 = 65535 × 1.25mV ≈ 81.92V</p>
+
+            <h3 className="text-xl font-medium text-gray-800 mb-2">3. 功率计算</h3>
+            <p className="mb-1">Power 寄存器单位 = 25 × Current_LSB</p>
+            <p className="mb-2"><strong>Power (W) = Power Register × 25 × Current_LSB</strong></p>
+            <p className="mb-1">由于功率寄存器值为电流寄存器的 1/25，读取后需乘回。</p>
+
+            <h3 className="text-xl font-medium text-gray-800 mb-2">4. 其他补充</h3>
+            <ul className="list-disc list-inside">
+              <li>Shunt Register：16-bit 补码，分辨率 2.5μV/bit</li>
+              <li>Bus Voltage Register：16-bit 无符号，1.25mV/bit</li>
+              <li>功率寄存器需校准后才有效；未设置校准寄存器则为 0</li>
+            </ul>
+          </div>
+
+          <h2 className="text-2xl font-semibold text-gray-700 mb-4">正向与反推计算模块</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="rshunt" className="block text-gray-700 font-medium mb-1">采样电阻 R<sub>shunt</sub> (毫欧)：</label>
+              <input
+                type="number"
+                id="rshunt"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="如 2"
+                value={rshunt}
+                onChange={(e) => setRshunt(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="imax" className="block text-gray-700 font-medium mb-1">预期最大电流 I<sub>max</sub> (A)：</label>
+              <input
+                type="number"
+                id="imax"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="如 15"
+                value={imax}
+                onChange={(e) => setImax(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="vbus" className="block text-gray-700 font-medium mb-1">电源电压 V<sub>bus</sub> (V)：</label>
+              <input
+                type="number"
+                id="vbus"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="如 12"
+                value={vbus}
+                onChange={(e) => setVbus(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="shunt" className="block text-gray-700 font-medium mb-1">Shunt寄存器值 (十进制)：</label>
+              <input
+                type="number"
+                id="shunt"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="如 8000"
+                value={shunt}
+                onChange={(e) => setShunt(e.target.value)}
+              />
+            </div>
+            <div className="col-span-1 md:col-span-2">
+              <label htmlFor="calibration" className="block text-gray-700 font-medium mb-1">校准寄存器值 (十进制)：</label>
+              <input
+                type="number"
+                id="calibration"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="如 2560"
+                value={calibration}
+                onChange={(e) => setCalibration(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={calculateCurrent}
+            className="mt-6 px-6 py-3 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-colors duration-200"
+          >
+            计算电流与功率
+          </button>
+
+          <div className="mt-6 text-lg text-green-600 result" dangerouslySetInnerHTML={{ __html: result }}></div>
+
+          <div className="mt-10 pt-6 border-t border-gray-300">
+            <h2 className="text-2xl font-semibold text-gray-700 mb-4">校准值自动修正（依据测量与实际偏差）</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="actualCurrent" className="block text-gray-700 font-medium mb-1">实际负载电流 (A)：</label>
+                <input
+                  type="number"
+                  id="actualCurrent"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="如 10"
+                  value={actualCurrent}
+                  onChange={(e) => setActualCurrent(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="measuredCurrent" className="block text-gray-700 font-medium mb-1">INA226 测得电流值 (A)：</label>
+                <input
+                  type="number"
+                  id="measuredCurrent"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="如 10.1"
+                  value={measuredCurrent}
+                  onChange={(e) => setMeasuredCurrent(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={reverseCalibration}
+              className="mt-6 px-6 py-3 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-colors duration-200"
+            >
+              反推修正校准值
+            </button>
+
+            <div className="mt-6 text-lg text-green-600 result" dangerouslySetInnerHTML={{ __html: reverseResult }}></div>
+          </div>
+        </div>
+      );
+    };
+
+    // 进制计算器组件
+    const BaseConverter = () => {
+      const [dec, setDec] = useState('');
+      const [bin, setBin] = useState('');
+      const [oct, setOct] = useState('');
+      const [hex, setHex] = useState('');
+      const [errorMessage, setErrorMessage] = useState('');
+      const [history, setHistory] = useState([]);
+      const errorTimeoutRef = useRef(null);
+      const historyDebounceTimerRef = useRef(null);
+
+      const MAX_HISTORY_ITEMS = 5; // 最大历史记录条数
+
+      // 辅助函数：显示错误消息
+      const showErrorMessage = (message) => {
+        setErrorMessage(message);
+        clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = setTimeout(() => {
+          setErrorMessage('');
+        }, 3000); // 3秒后消失
+      };
+
+      // 辅助函数：将数字转换为指定进制的字符串，并处理十六进制大写
+      const convertToBaseString = (num, base) => {
+        if (num === '' || isNaN(num) || num < 0) return '';
+        let result = Math.floor(num).toString(base); // 确保是整数，避免浮点数问题
+        if (base === 16) {
+          result = result.toUpperCase();
+        }
+        return result;
+      };
+
+      // 辅助函数：添加历史记录
+      const addHistory = (decimalValue) => {
+        if (decimalValue === '' || isNaN(parseInt(decimalValue)) || parseInt(decimalValue) < 0) return;
+
+        const decVal = parseInt(decimalValue);
+        const record = `DEC: ${decVal} | BIN: ${convertToBaseString(decVal, 2)} | OCT: ${convertToBaseString(decVal, 8)} | HEX: ${convertToBaseString(decVal, 16)}`;
+
+        setHistory((prevHistory) => {
+          const newHistory = [record, ...prevHistory];
+          if (newHistory.length > MAX_HISTORY_ITEMS) {
+            newHistory.pop(); // 移除最旧的
+          }
+          return newHistory;
+        });
+      };
+
+      // 统一的输入处理函数
+      const handleInputChange = (e, targetBase) => {
+        let inputValue = e.target.value;
+
+        // 1. 小写字母自动转换成大写 (仅针对十六进制)
+        if (targetBase === 16) {
+          inputValue = inputValue.toUpperCase();
+        }
+
+        // 2. 根据进制类型，过滤不符合的字符
+        let validRegex;
+        switch (targetBase) {
+          case 2:
+            validRegex = /^[01]*$/;
+            break;
+          case 8:
+            validRegex = /^[0-7]*$/;
+            break;
+          case 10:
+            validRegex = /^[0-9]*$/;
+            break;
+          case 16:
+            validRegex = /^[0-9A-F]*$/;
+            break;
+          default:
+            validRegex = /.*/; // 默认匹配所有 (不应该发生)
+        }
+
+        // 检查并过滤无效字符
+        let filteredValue = '';
+        let hasInvalidChar = false; // Flag to indicate if invalid characters were found
+        for (let i = 0; i < inputValue.length; i++) {
+          const char = inputValue[i];
+          if (validRegex.test(char)) {
+            filteredValue += char;
+          } else {
+            hasInvalidChar = true;
+            // Only show error message if the filtered value is different from original
+            // This prevents showing error on every character if the input is already filtered
+            if (inputValue !== filteredValue) { // Simple check, could be more robust
+                 showErrorMessage(`检测到不符合${targetBase}进制的字符 "${char}"，已忽略。`);
+            }
+          }
+        }
+        
+        // Update the input field's value directly to reflect filtering
+        if (e.target.value !== filteredValue) {
+            e.target.value = filteredValue;
+        }
+
+        // 3. 将当前输入转换为十进制
+        let newDecValue;
+        if (filteredValue === '') {
+          newDecValue = ''; // 输入为空时，十进制也为空
+        } else {
+          newDecValue = parseInt(filteredValue, targetBase);
+          if (isNaN(newDecValue)) {
+            // 如果转换结果是NaN (例如输入不完整或错误)，则不更新其他值
+            // 但仍然更新当前输入框的值为过滤后的值
+            switch (targetBase) {
+              case 2: setBin(filteredValue); break;
+              case 8: setOct(filteredValue); break;
+              case 10: setDec(filteredValue); break;
+              case 16: setHex(filteredValue); break;
+            }
+            return;
+          }
+        }
+
+        // 4. 更新所有输入框的值
+        setDec(convertToBaseString(newDecValue, 10));
+        setBin(convertToBaseString(newDecValue, 2));
+        setOct(convertToBaseString(newDecValue, 8));
+        setHex(convertToBaseString(newDecValue, 16));
+
+        // 5. 添加到历史记录 (去抖动)
+        clearTimeout(historyDebounceTimerRef.current);
+        historyDebounceTimerRef.current = setTimeout(() => {
+          if (newDecValue !== '' && !isNaN(newDecValue)) {
+            addHistory(newDecValue.toString());
+          }
+        }, 800); // 停止输入0.8秒后添加历史记录
+      };
+
+      return (
+        <div className="w-80 bg-gray-100 rounded-lg shadow-xl p-6 font-inter border border-gray-300">
+          <h2 className="text-xl font-bold text-gray-800 text-center mb-4">进制转换器</h2>
+
+          {/* 历史记录区域 */}
+          <div className="bg-gray-200 border border-gray-300 rounded-md p-2 mb-4 h-24 overflow-y-auto text-sm text-gray-700">
+            {history.length === 0 ? (
+              <p className="text-center text-gray-500 mt-6">无历史记录</p>
+            ) : (
+              history.map((item, index) => (
+                <div key={index} className="border-b border-gray-300 last:border-b-0 py-1 px-1">
+                  {item}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* 输入框 */}
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="decInput" className="block text-gray-600 text-sm font-medium mb-1">十进制 (DEC):</label>
+              <input
+                type="text"
+                id="decInput"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 base-input text-lg text-right"
+                value={dec}
+                onChange={(e) => handleInputChange(e, 10)}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label htmlFor="binInput" className="block text-gray-600 text-sm font-medium mb-1">二进制 (BIN):</label>
+              <input
+                type="text"
+                id="binInput"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 base-input text-lg text-right"
+                value={bin}
+                onChange={(e) => handleInputChange(e, 2)}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label htmlFor="octInput" className="block text-gray-600 text-sm font-medium mb-1">八进制 (OCT):</label>
+              <input
+                type="text"
+                id="octInput"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 base-input text-lg text-right"
+                value={oct}
+                onChange={(e) => handleInputChange(e, 8)}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label htmlFor="hexInput" className="block text-gray-600 text-sm font-medium mb-1">十六进制 (HEX):</label>
+              <input
+                type="text"
+                id="hexInput"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 base-input text-lg text-right"
+                value={hex}
+                onChange={(e) => handleInputChange(e, 16)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          {/* 错误提示区域 */}
+          <div className="mt-4 text-red-600 text-sm min-h-[20px] text-center">
+            {errorMessage}
+          </div>
+        </div>
+      );
+    };
+
+    // 主应用组件
+    const App = () => {
+      return (
+        // 使用 Tailwind CSS 设置全局样式
+        <div className="min-h-screen bg-gray-50 p-6 flex flex-col lg:flex-row lg:justify-center relative">
+          {/* INA226 计算器在左侧/主内容区 */}
+          <div className="flex-grow max-w-4xl mx-auto lg:mx-0 bg-white p-6 rounded-xl shadow-lg mb-8 lg:mb-0 lg:mr-8">
+            <INA226Calculator />
+          </div>
+
+          {/* 进制转换器固定在右侧 */}
+          <div className="fixed right-4 top-4 z-50 transform lg:static lg:transform-none lg:w-96">
+            <BaseConverter />
+          </div>
+        </div>
+      );
+    };
+
+    // Render the App component to the 'root' div
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

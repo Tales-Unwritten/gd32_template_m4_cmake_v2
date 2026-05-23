@@ -1,0 +1,39 @@
+# CompileFlags:
+#   CompilationDatabase: build/debug
+#   Add:
+#     - --target=arm-none-eabi
+#     - -isystem
+#     - /usr/include/newlib
+#     - -isystem
+#     - /usr/include/newlib/c++/14.2.1
+#     - -isystem
+#     - /usr/include/newlib/c++/14.2.1/arm-none-eabi
+#     - -isystem
+#     - /usr/arm-none-eabi/include
+#     - -isystem
+#     - /usr/lib/gcc/arm-none-eabi/14.2.1/include
+
+# Diagnostics:
+#   UnusedIncludes: None
+
+#MACOS
+
+CompileFlags:
+  CompilationDatabase: build/debug
+  Add:
+    - --target=arm-none-eabi
+    - "-isystem"
+    - "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1"
+    - "-isystem"
+    - "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/arm-none-eabi"
+    - "-isystem"
+    - "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include/c++/15.2.1/backward"
+    - "-isystem"
+    - "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/15.2.1/include"
+    - "-isystem"
+    - "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/15.2.1/include-fixed"
+    - "-isystem"
+    - "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/arm-none-eabi/include"
+
+Diagnostics:
+  UnusedIncludes: None

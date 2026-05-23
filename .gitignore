@@ -1,0 +1,31 @@
+# Build outputs
+build/
+
+# Cache
+.cache/
+
+# CMake generated
+cmake-build-*/
+
+# Object files
+*.o
+*.obj
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+
+# Libraries
+*.a
+*.la
+*.lo
+*.lib
+
+# Debug
+*.out
+*.app
+
+# OS files
+.DS_Store
+Thumbs.db
