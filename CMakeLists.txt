@@ -91,36 +91,12 @@ add_executable(${PROJECT_NAME}.elf)
 
 target_sources(${PROJECT_NAME}.elf PRIVATE
 
-    # startup
+    # ── 启动 / 系统 ──────────────────────────────────
     ${STARTUP_FILE}
     ${SYSCALLS_FILE}
-
-    # system
     ${CMSIS_DIR}/GD/GD32F4xx/Source/system_gd32f4xx.c
 
-    # code
-    code/src/main.c
-    code/src/gd32f4xx_it.c
-    code/src/systick.c
-    code/src/link.c
-
-    # hardware
-    Hardware/src/debug_uart.c
-    Hardware/src/bsp_led.c
-
-    # interface
-    interface/src/io_ctrl.cpp
-    interface/src/device_i2c_bus.cpp
-    interface/src/device_i2c_dev.cpp
-
-    # bsp
-    bsp/src/ina226.cpp
-    bsp/src/ina228.cpp
-
-    # user
-    user/src/founction.cpp
-
-    # gd32 lib
+    # ── GD32 标准外设库 ─────────────────────────────
     ${LIB_DIR}/Source/gd32f4xx_rcu.c
     ${LIB_DIR}/Source/gd32f4xx_gpio.c
     ${LIB_DIR}/Source/gd32f4xx_misc.c
@@ -132,6 +108,47 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     ${LIB_DIR}/Source/gd32f4xx_dma.c
     ${LIB_DIR}/Source/gd32f4xx_exti.c
     ${LIB_DIR}/Source/gd32f4xx_syscfg.c
+
+    # ── 内核 / 调度 ─────────────────────────────────
+    code/src/main.c
+    code/src/gd32f4xx_it.c
+    code/src/systick.c
+    code/src/link.c
+
+    # ── 硬件层（旧 C 驱动，逐步迁移中） ─────────────
+    Hardware/src/bsp_led.c
+    Hardware/src/eeprom.c
+    # Hardware/src/debug_uart.c  # 已迁移至 interface/usart_port
+
+    # ── 接口抽象层（C++ 核心驱动） ───────────────────
+    interface/src/io_ctrl.cpp           # GPIO 引脚管理
+    interface/src/usart_port.cpp        # 串口通用驱动（含 ISR）
+    interface/src/device_i2c_bus.cpp    # I2C 总线
+    interface/src/device_i2c_dev.cpp    # I2C 设备基类
+
+    # ── BSP 设备驱动 ────────────────────────────────
+    bsp/src/ina226.cpp                  # INA226 电压/电流传感器
+    bsp/src/ina228.cpp                  # INA228 高精度传感器
+    bsp/src/debug_port.cpp              # Debug 串口 (USART0)
+    bsp/src/rs485_port.cpp              # RS485 串口 (USART1, DE=PG13)
+    bsp/src/rs232_port.cpp              # RS232 串口 (USART2)
+
+    # ── Modbus 协议栈 ───────────────────────────────
+    middleware/modbus/src/modbus_crc.cpp         # CRC 校验
+    middleware/modbus/src/modbus_map.cpp         # 寄存器映射表
+    middleware/modbus/src/modbus_port_cfg.cpp    # 端口配置（平台胶水）
+    middleware/modbus/src/modbus.cpp             # 协议核心（帧解析/功能码）
+
+    # ── 应用协议层 ─────────────────────────────────
+    App/src/private.cpp                 # 波特率存储管理
+    App/src/protocol.cpp                # 多协议调度 + Modbus 寄存器刷新
+    App/src/protocol_string.cpp         # 字符串指令解析器
+    App/src/pc_task.cpp                 # 任务入口（薄调度）
+
+    # ── 用户应用 ───────────────────────────────────
+    user/src/founction.cpp              # 主循环 / 初始化
+    user/src/cmd_parser.cpp
+    user/src/cmd_table.cpp
 )
 
 # ============================================================
@@ -153,6 +170,8 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
     interface/inc
     bsp/inc
     user/inc
+    middleware/modbus/inc
+    App/inc
 )
 
 # ============================================================

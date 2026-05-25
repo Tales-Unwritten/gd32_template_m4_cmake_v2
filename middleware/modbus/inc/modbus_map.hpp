@@ -16,9 +16,6 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-// C++ 专用头文件依赖（CRC 计算和协议处理）
-#include "modbus_crc.hpp"
-#include "modbus.hpp"
 
 // ============================================================
 // 【1】Modbus 区块类型枚举

@@ -5,9 +5,9 @@
 #include "stdio.h"
 #include "string.h"
 
-#include "../Hardware/inc/bsp_led.h"
-#include "../Hardware/inc/debug_uart.h"
-#include "../Hardware/inc/bitband.h"
+#include "bsp_led.h"
+#include "debug_uart.h"
+#include "bitband.h"
 
 #define RS485_BAUDRATE                    115200U    /*!< 默认通信波特率 */
 

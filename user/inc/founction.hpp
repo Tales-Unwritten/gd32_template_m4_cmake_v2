@@ -1,8 +1,11 @@
 #pragma once
 
-// #ifdef __cplusplus
-
 #include "link.h"
+
+#ifdef __cplusplus
+#include "usart_port.hpp"
+#include "debug_port.hpp"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,5 +17,3 @@ extern void function_loop(void);
 #ifdef __cplusplus
 }
 #endif
-
-// #endif

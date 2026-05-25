@@ -46,10 +46,15 @@ extern "C" {
 #include "gd32f4xx_libopt.h"
 #include "systick.h"
 
-// === 你自己的驱动层 ===
-#include "debug_uart.h"
-
 #ifdef __cplusplus
 #undef register
 }
+
+// === C++ 专用驱动层 ===
+#include "usart_port.hpp"
+
+extern usart_port debug_uart;
+extern usart_port rs485_uart;
+extern usart_port rs232_uart;
+
 #endif

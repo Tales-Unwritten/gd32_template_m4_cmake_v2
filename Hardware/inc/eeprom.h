@@ -1,7 +1,7 @@
 #pragma once
-#include "GD32F4xx.h"
+#include "gd32f4xx.h"
 #include "systick.h"
-#include "../Hardware/inc/soft_i2c.h"
+#include "soft_i2c.h"
 #include "stdint.h"
 #include "string.h"
 

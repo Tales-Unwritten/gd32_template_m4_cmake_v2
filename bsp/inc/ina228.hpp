@@ -3,11 +3,14 @@
 #ifdef __cplusplus
 
 #include "device_i2c_dev.hpp"
+#include "io_ctrl.hpp"
 #include <cstdint>
 
+// ============================================================
+// Snapshot
+// ============================================================
 
-
-struct Snapshot
+struct INA228_Snapshot
 {
     uint16_t config;          // 0x00 配置
     uint16_t adcConfig;       // 0x01 ADC 配置
@@ -34,13 +37,33 @@ struct Snapshot
     uint16_t deviceID;        // 0x3F 器件 ID
 };
 
+// ============================================================
+//  Alert 标志位（DIAG_ALRT 寄存器 bit 7-0 状态字段）
+//  读后自动清除（锁存模式）或实时反映（非锁存模式）
+// ============================================================
+
+struct INA228_AlertFlags
+{
+    bool memStatus;       // bit 0: 存储器校验错误
+    bool conversionReady; // bit 1: 转换完成
+    bool powerOverLimit;  // bit 2: 功率超限
+    bool busUnderLimit;   // bit 3: 总线欠压
+    bool busOverLimit;    // bit 4: 总线过压
+    bool shuntUnderLimit; // bit 5: 分流欠压
+    bool shuntOverLimit;  // bit 6: 分流过压
+    bool tempOverLimit;   // bit 7: 温度超限
+    bool mathOverflow;    // bit 9: 数学溢出
+    bool chargeOverflow;  // bit 10: 电荷溢出
+    bool energyOverflow;  // bit 11: 能量溢出
+};
+
+// ============================================================
+
 class INA228
 {
 public:
 
-    // ============================================================
-    // Address
-    // ============================================================
+    // ── I2C 地址 ──────────────────────────────────────────
 
     enum Addr : uint8_t
     {
@@ -50,315 +73,115 @@ public:
         ADDR_0x45 = 0x45,
     };
 
+    // ── CONFIG 寄存器枚举 ─────────────────────────────────
 
-    //config reg=================================================
-    enum class Reset : uint8_t
-    {
-        //15 Bit
-        Normal = 0,
-        SoftReset = 1,
-    };
+    enum class Reset : uint8_t    { Normal = 0, SoftReset = 1 };
+    enum class Retacc : uint8_t   { Normal = 0, Clear = 1 };
+    enum class Convdly : uint8_t  { Ms0 = 0, Ms2 = 1, Ms510 = 0xFF };
+    enum class Tempcomp : uint8_t { Disable = 0, Enable = 1 };
+    enum class Adcrange : uint8_t { Range_163mv = 0, Range_40mv = 1 };
+    enum class Reserved : uint8_t { Reserved_0 = 0 };
 
-    enum class Retacc : uint8_t
-    {
-        //14 Bit
-        Normal = 0x00,
-        Clear = 0x01,
-    };
+    // ── DIAG_ALRT 配置位（bit 15-8，可写） ────────────────
 
+    enum class Alatch : uint8_t     { Disable = 0, Enable = 1 };
+    enum class Cnvr : uint8_t       { Disable = 0, Enable = 1 };
+    enum class Slowalert : uint8_t  { Disable = 0, Enable = 1 };
+    enum class Apol : uint8_t       { ActiveLow = 0, ActiveHigh = 1 };
 
-    enum class Convdly : uint8_t
-    {
-        //6-13 Bit
-        Ms0   = 0x00,
-        Ms2   = 0x01,
-        Ms510 = 0xFF,
-    };
-
-    enum class Tempcomp : uint8_t
-    {
-        //5 Bit
-        Disable = 0x00,
-        Enable = 0x01,
-    };
-
-    enum class Adcrange : uint8_t
-    {
-        //4 Bit
-        Range_163mv = 0x00,
-        Range_40mv = 0x01,
-    };
-
-    enum class Reserved : uint8_t
-    {
-        //0-3 Bit
-        Reserved_0 = 0x00,
-    };
-    //=============================================================
-
-
-    //Diag Alrt ========================================================
-    enum class Alatch : uint8_t
-    {
-        //15 Bit
-        Alatch_Enable = 0x01,
-        Alatch_Disable = 0x00,
-    };
-
-    enum class Cnvr : uint8_t
-    {
-        //14 Bit
-        Cnvr_Enable = 0x01,
-        Cnvr_Disable = 0x00,
-    };
-
-    enum class Slowalert : uint8_t
-    {
-        //13 Bit
-        Slowalert_Enable = 0x01,
-        Slowalert_Disable = 0x00,
-    };
-
-
-    enum class Apol : uint8_t
-    {
-        //12 Bit
-        Apol_L = 0x00, //低电平有效，开漏
-        Apol_H = 0x01, //高电平有效，开漏
-    };
-
-    enum class Energyof : uint8_t
-    {
-        //11 Bit
-        Energyof_Normal = 0x00,
-        Energyof_Overflow = 0x01,
-    };
-
-    enum class Chargeof : uint8_t
-    {
-        //10 Bit
-        Chargeof_Normal = 0x00,
-        Chargeof_Overflow = 0x01,
-    };
-
-    enum class Mathof : uint8_t
-    {
-        //9 Bit
-        Mathof_Normal = 0x00,
-        Mathof_Overflow = 0x01,
-    };
-
-
-    enum class Dig_Reserved : uint8_t
-    {
-        //8 Bit
-        Reserved_0 = 0x00,
-    };
-
-    enum class Tmp_Ol : uint8_t
-    {
-        //7 Bit
-        Tmpol_Normal = 0x00,
-        Tmpol_Overflow = 0x01,
-    };
-
-
-
-
-    enum class Shnt_Ol : uint8_t
-    {
-        //6 Bit
-        Shntol_Normal = 0x00,
-        Shntol_Overflow = 0x01,
-    };
-
-
-    enum class Shnt_Ul : uint8_t
-    {
-        //5 Bit
-        Shntul_Normal = 0x00,
-        Shntul_Overflow = 0x01,
-    };
-
-    enum class Vbus_Ol : uint8_t
-    {
-        //4 Bit
-        Vbus_Normal = 0x00,
-        Vbus_Overflow = 0x01,
-    };
-
-    enum class Vbus_Ul : uint8_t
-    {
-        //3 Bit
-        Vbus_Normal = 0x00,
-        Vbus_Overflow = 0x01,
-    };
-
-
-    enum class Pow_Ol : uint8_t
-    {
-        //2 Bit
-        Pow_Normal = 0x00,
-        Pow_Overflow = 0x01,
-    };
-
-
-    enum class Cnvrf : uint8_t
-    {
-        //1 Bit
-        Normal = 0x00,
-        Conversion_complete = 0x01,
-    };
-
-
-    enum class Menstat  : uint8_t
-    {
-        //0 Bit
-        Check = 0x00,
-        Normal = 0x01,
-    };
-
-    // ============================================================
-    // Registers
-    // ============================================================
+    // ── 寄存器地址 ────────────────────────────────────────
 
     enum Reg : uint8_t
     {
-        REG_CONFIG           = 0x00, // 配置
-        REG_ADC_CONFIG       = 0x01, // ADC 配置
-        REG_SHUNT_CAL        = 0x02, // 分流校准
-        REG_VSHUNT           = 0x04, // 分流电压 (24bit)
-        REG_VBUS             = 0x05, // 总线电压 (24bit)
-        REG_DIETEMP          = 0x06, // 芯片温度
-        REG_CURRENT          = 0x07, // 电流结果 (24bit)
-        REG_POWER            = 0x08, // 功率结果 (24bit)
-        REG_ENERGY           = 0x09, // 电能累积 (40bit)
-        REG_CHARGE           = 0x0A, // 电荷累积 (40bit)
-        REG_DIAG_ALERT       = 0x0B, // 诊断与报警标志
-        REG_SOVL             = 0x0C, // 分流过压阈值
-        REG_SUVL             = 0x0D, // 分流欠压阈值
-        REG_BOVL             = 0x0E, // 总线过压阈值
-        REG_BUVL             = 0x0F, // 总线欠压阈值
-        REG_TEMP_LIMIT       = 0x10, // 温度限制
-        REG_PWR_LIMIT        = 0x11, // 功率限制
-        REG_MANUFACTURER_ID  = 0x3E, // 制造商 ID (TI: 0x5449)
-        REG_DEVICE_ID        = 0x3F, // 器件 ID
+        REG_CONFIG           = 0x00, REG_ADC_CONFIG   = 0x01,
+        REG_SHUNT_CAL        = 0x02, REG_SHUNT_TEMPCO = 0x03,
+        REG_VSHUNT           = 0x04, REG_VBUS         = 0x05,
+        REG_DIETEMP          = 0x06, REG_CURRENT      = 0x07,
+        REG_POWER            = 0x08, REG_ENERGY       = 0x09,
+        REG_CHARGE           = 0x0A, REG_DIAG_ALERT   = 0x0B,
+        REG_SOVL             = 0x0C, REG_SUVL         = 0x0D,
+        REG_BOVL             = 0x0E, REG_BUVL         = 0x0F,
+        REG_TEMP_LIMIT       = 0x10, REG_PWR_LIMIT    = 0x11,
+        REG_MANUFACTURER_ID  = 0x3E, REG_DEVICE_ID    = 0x3F,
     };
-    // ============================================================
-    // ENUM
-    // ============================================================
 
+    // ── ADC 模式 ──────────────────────────────────────────
 
     enum class ADCMode : uint8_t
     {
-        Shutdown                              = 0x00,  // 关断
-        Trig_BusV                             = 0x01,  // 触发总线电压，单次
-        Trig_ShuntV                           = 0x02,  // 触发分流电压，单次
-        Trig_BusV_ShuntV                      = 0x03,  // 触发总线电压和分流电压，单次
-        Trig_Temp                             = 0x04,  // 触发温度，单次
-        Trig_BusV_Temp                        = 0x05,  // 触发总线电压和温度，单次
-        Trig_ShuntV_Temp                      = 0x06,  // 触发分流电压和温度，单次
-        Trig_BusV_ShuntV_Temp                 = 0x07,  // 触发总线电压、分流电压和温度，单次
-        Shutdown2                             = 0x08,  // 关断（0x00 的重复值）
-        Cont_BusV                             = 0x09,  // 仅连续总线电压
-        Cont_ShuntV                           = 0x0A,  // 仅连续分流电压
-        Cont_BusV_ShuntV                      = 0x0B,  // 连续总线电压和分流电压
-        Cont_Temp                             = 0x0C,  // 仅连续温度
-        Cont_BusV_Temp                        = 0x0D,  // 连续总线电压和温度
-        Cont_ShuntV_Temp                      = 0x0E,  // 连续温度和分流电压
-        Cont_BusV_ShuntV_Temp                 = 0x0F,  // 连续总线电压、分流电压和温度
+        Shutdown                    = 0x00,
+        Trig_BusV                   = 0x01, Trig_ShuntV             = 0x02,
+        Trig_BusV_ShuntV            = 0x03, Trig_Temp               = 0x04,
+        Trig_BusV_Temp              = 0x05, Trig_ShuntV_Temp        = 0x06,
+        Trig_BusV_ShuntV_Temp       = 0x07,
+        Shutdown2                   = 0x08,
+        Cont_BusV                   = 0x09, Cont_ShuntV             = 0x0A,
+        Cont_BusV_ShuntV            = 0x0B, Cont_Temp               = 0x0C,
+        Cont_BusV_Temp              = 0x0D, Cont_ShuntV_Temp        = 0x0E,
+        Cont_BusV_ShuntV_Temp       = 0x0F,
     };
-
 
     enum class ConvTime : uint8_t
     {
-        Us50   = 0x00,
-        Us84   = 0x01,
-        Us150  = 0x02,
-        Us280  = 0x03,
-        Us540  = 0x04,
-        Us1052 = 0x05,
-        Us2074 = 0x06,
-        Us4120 = 0x07,
+        Us50 = 0, Us84 = 1, Us150 = 2, Us280 = 3,
+        Us540 = 4, Us1052 = 5, Us2074 = 6, Us4120 = 7,
     };
 
     enum class AvgSample : uint8_t
     {
-        N1    = 0x00,
-        N4    = 0x01,
-        N16   = 0x02,
-        N64   = 0x03,
-        N128  = 0x04,
-        N256  = 0x05,
-        N512  = 0x06,
-        N1024 = 0x07,
+        N1 = 0, N4 = 1, N16 = 2, N64 = 3,
+        N128 = 4, N256 = 5, N512 = 6, N1024 = 7,
     };
 
     // ============================================================
-    // Config
+    //  Config 结构体（用户可定制）
     // ============================================================
 
     struct Config
     {
+        // ── CONFIG 寄存器 ──
+        Reset     reset      = Reset::Normal;
+        Retacc    retacc     = Retacc::Normal;
+        Convdly   convdly    = Convdly::Ms0;
+        Tempcomp  tempcomp   = Tempcomp::Disable;
+        Adcrange  adcrange   = Adcrange::Range_163mv;
+        Reserved  reserved   = Reserved::Reserved_0;
 
-        //CONFIG REG
-        Reset reset = Reset::Normal;
-        Retacc retacc = Retacc::Normal;
-        Convdly convdly = Convdly::Ms0;
-        Tempcomp tempcomp = Tempcomp::Disable;
-        Adcrange adcrange = Adcrange::Range_163mv;
-        int32_t maxCurrent_mA = 163840;
-        Reserved reserved = Reserved::Reserved_0;
+        // ── ADC 寄存器 ──
+        ADCMode   adcMode        = ADCMode::Cont_BusV_ShuntV_Temp;
+        ConvTime  busConvTime    = ConvTime::Us1052;
+        ConvTime  shuntConvTime  = ConvTime::Us1052;
+        ConvTime  tempConvTime   = ConvTime::Us280;
+        AvgSample averaging      = AvgSample::N128;
 
-        // ADC REG
-        ADCMode adcMode = ADCMode::Cont_BusV_ShuntV_Temp;
-        ConvTime busConvTime   = ConvTime::Us1052;
-        ConvTime shuntConvTime = ConvTime::Us1052;
-        ConvTime tempConvTime  = ConvTime::Us280;
-        AvgSample averaging = AvgSample::N128;
+        // ── 报警配置（bit 15-8，可写） ──
+        Alatch    alatch     = Alatch::Enable;       // 锁存报警
+        Cnvr      cnvr       = Cnvr::Disable;        // 转换完成不触发
+        Slowalert slowalert  = Slowalert::Disable;   // 不用平均数据比较
+        Apol      apol       = Apol::ActiveLow;      // 开漏低有效
 
-        //DIG_ALERT REG
-        Alatch alatch = Alatch::Alatch_Enable;
-        Cnvr cnvr = Cnvr::Cnvr_Disable;
-        Slowalert slowalert = Slowalert::Slowalert_Disable;
-        Apol apol = Apol::Apol_L;
-        Energyof energyof = Energyof::Energyof_Normal;
-        Chargeof chargeof = Chargeof::Chargeof_Normal;
-        Mathof mathof = Mathof::Mathof_Normal;
-        Dig_Reserved dig_reserved = Dig_Reserved::Reserved_0;
-        Tmp_Ol tmpol = Tmp_Ol::Tmpol_Normal;
-        Shnt_Ol shntol = Shnt_Ol::Shntol_Overflow;
-        Shnt_Ul shntul = Shnt_Ul::Shntul_Normal;
-        Vbus_Ol vbus_ol = Vbus_Ol::Vbus_Overflow;
-        Vbus_Ul vbus_ul = Vbus_Ul::Vbus_Overflow;
-        Pow_Ol pow_ol = Pow_Ol::Pow_Normal;
-        Cnvrf cnvrf = Cnvrf::Normal;
-        Menstat menstat = Menstat::Normal;
+        // ── 报警引脚自动配置（0=不使用） ──
+        uint32_t  alert_port = 0;               // GPIO 端口，如 GPIOB
+        uint32_t  alert_pin  = 0;               // 引脚掩码，如 GPIO_PIN_5
 
-        uint16_t shuntCal = 0x1000;
-        uint16_t r_shunt_uOhm=1000;
-
-
-        uint32_t bovl_limit = 0xFFFF;
-
-        // int32_t maxCurrent_mA = 40960;
+        // ── 校准参数 ──
+        uint16_t shuntCal       = 0x1000;
+        uint16_t r_shunt_uOhm   = 1000;     // 采样电阻 µΩ
+        int32_t  maxCurrent_mA  = 163840;   // 最大电流 mA（用于 LSB 计算）
     };
 
-public:
+    // ============================================================
+    //  构造
+    // ============================================================
 
-    explicit INA228(device_i2c_bus* bus,
-                    uint8_t addr = ADDR_0x40);
-
-    explicit INA228(device_i2c_bus* bus,
-                    uint8_t addr,
-                    const Config& cfg);
+    explicit INA228(device_i2c_bus* bus, uint8_t addr = ADDR_0x40);
+    explicit INA228(device_i2c_bus* bus, uint8_t addr, const Config& cfg);
+    ~INA228();
 
     void init();
 
-public:
-
     // ============================================================
-    // Measurement API
+    //  测量 API
     // ============================================================
 
     int32_t getBusVoltage_mV();
@@ -369,43 +192,89 @@ public:
     int64_t getEnergy_mJ();
     int64_t getCharge_mC();
 
-public:
+    // ============================================================
+    //  阈值配置
+    // ============================================================
 
     void set_sovl_limit_mA(int32_t sovl_mA);
     void set_suvl_limit_mA(int32_t suvl_mA);
     void set_bovl_limit_mV(uint16_t bovl_mV);
     void set_buvl_limit_mV(uint16_t buvl_mV);
-    void set_temp_limit_C(uint16_t temp_C);
+    void set_temp_limit_C(uint8_t temp_C);
     void set_pwr_limit_mW(uint32_t pwr_mW);
+
+    // ============================================================
+    //  报警引脚 / 标志
+    // ============================================================
+
+    /**
+     * @brief 绑定外部 ALERT 引脚（开漏输出，需外部上拉）
+     * @param pin  已初始化为 INPUT + PULLUP 的 io_ctrl 对象
+     * @note  调用时机：init() 之后。传入 nullptr 解除绑定。
+     */
+    void bindAlertPin(io_ctrl *pin);
+
+    /**
+     * @brief 读取 DIAG_ALRT 寄存器，解析为结构化标志
+     * @note  锁存模式下，读取会自动清除锁存的报警位
+     */
+    [[nodiscard]] INA228_AlertFlags readAlertFlags();
+
+    /**
+     * @brief 快速检查 ALERT 引脚是否被拉低（轮询用）
+     * @note  需先通过 bindAlertPin() 绑定引脚
+     */
+    [[nodiscard]] bool isAlertAsserted();
+
+    /** @brief 便捷方法：等同 isAlertAsserted() */
+    [[nodiscard]] bool CheckAlert() { return isAlertAsserted(); }
+
+    /**
+     * @brief 解锁报警（退出锁存状态）
+     * @note  读取 DIAG_ALRT → 写 0x0001 到配置位 = 软复位报警状态机
+     */
+    void clearAlertLatch();
+
+    /** @brief 读取 DIAG_ALRT 原始值（调试用，排查持续报警原因） */
+    uint16_t readDiagAlertRaw();
+
+    // ============================================================
+    //  设备信息
+    // ============================================================
 
     uint16_t getManufacturerID();
     uint16_t getDeviceID();
-    void unlock();
 
-public:
+    // ============================================================
+    //  调试
+    // ============================================================
 
     void dumpRegisters();
 
 private:
 
     device_i2c_dev _dev;
+    Config         _cfg;
+    io_ctrl       *_alertPin    = nullptr;   // 外部报警引脚（高级用户 bindAlertPin 用）
+    uint32_t       _alertPort    = 0;         // 自动配置的 GPIO 端口
+    uint32_t       _alertPinMask = 0;         // 自动配置的引脚掩码
+    bool           _alertCfg     = false;     // 是否已自动配置
 
-    Config _cfg;
+    int32_t _currentLSB_uA;              // Current LSB (µA)
 
-    // current LSB (uA)
-    int32_t _currentLSB_uA;
+    // ── I2C 读写 ──────────────────────────────────────────
 
-private:
-
-    void writeRaw(uint8_t reg,
-                  uint64_t data,
-                  uint8_t len);
-
+    void     writeRaw(uint8_t reg, uint64_t data, uint8_t len);
     uint64_t readRaw(uint8_t reg);
-
     static uint8_t regLen(uint8_t reg);
 
-private:
+    // ── 寄存器构建 ────────────────────────────────────────
+
+    uint16_t buildConfigReg()    const;
+    uint16_t buildADCConfigReg() const;
+    uint16_t buildDiagAlertCfg() const;   // 仅配置位 15-8
+
+    // ── 符号扩展 ──────────────────────────────────────────
 
     template<uint8_t Bits>
     static constexpr int64_t signExtend(uint64_t raw)
@@ -414,34 +283,21 @@ private:
         return (static_cast<int64_t>(raw << shift)) >> shift;
     }
 
-private:
+    // ── 原始值 → 物理量 ───────────────────────────────────
 
     static int32_t rawToBusVoltage_mV(uint64_t raw);
-
     static int32_t rawToShuntVoltage_uV(uint64_t raw);
-
     int32_t rawToCurrent_mA(uint64_t raw) const;
-
     static int32_t rawToTemperature_mC(uint64_t raw);
-
     int32_t rawToPower_mW(uint64_t raw) const;
-
     int64_t rawToEnergy_mJ(uint64_t raw) const;
-
     int64_t rawToCharge_mC(uint64_t raw) const;
 
-    void captureSnapshot(Snapshot& snap);
-    void dumpRawRegisters(const Snapshot& snap);
-    void dumpEngineeringData(const Snapshot& snap);
+    // ── 调试 ──────────────────────────────────────────────
 
-
-private:
-
-    uint16_t buildConfigReg() const;
-
-    uint16_t buildADCConfigReg() const;
-
-    uint16_t buildDiagConfigReg() const;
+    void captureSnapshot(INA228_Snapshot& snap);
+    void dumpRawRegisters(const INA228_Snapshot& snap);
+    void dumpEngineeringData(const INA228_Snapshot& snap);
 };
 
 #endif

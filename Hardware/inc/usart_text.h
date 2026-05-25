@@ -5,9 +5,9 @@
 #include "stdio.h"
 #include "string.h"
 
-#include "../Hardware/inc/bsp_led.h"
-#include "../Hardware/inc/debug_uart.h"
-#include "../Hardware/inc/bitband.h"
+#include "bsp_led.h"
+#include "debug_uart.h"
+#include "bitband.h"
 #define USARTx_USART_TX_RCU     RCU_GPIOB         // 串口TX的端口时钟
 #define USARTx_USART_RX_RCU     RCU_GPIOB         // 串口RX的端口时钟
 #define USARTx_USART_RCU        RCU_USART2        // 串口1的时钟

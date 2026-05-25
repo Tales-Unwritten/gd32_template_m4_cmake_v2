@@ -61,20 +61,30 @@ uint16_t DeviceBlock[10] =
  */
 uint16_t ControlBlock[50];
 
-/** 实时数据区（INPUT 寄存器，只读）
- *  地址范围: 0x0040 ~ 0x0071（共 50 个寄存器）
- *  用途示例:
- *    [0]~[1] = 总线电压           （uint32_t，单位 μV，大端序：[0]=高16位, [1]=低16位）
- *    [2]~[3] = 总线电流           （uint32_t，单位 μA）
- *    [4]     = 温度               （uint16_t，单位 0.1°C）
- *    [5]     = 继电器状态回读     （uint16_t，0=断开, 1=闭合）
- *    [6]~[49]= 保留给其他实时数据
+/** 实时数据区（INPUT 寄存器，只读） —— ★ INA228 测试映射 ★
  *
- *  使用方式:
- *    - 固件业务逻辑周期性采集硬件数据，填入 StatusBlock[n]
- *    - Modbus 主站通过读 INPUT 寄存器获取实时数据（只能读，不能写）
- *    - 例: StatusBlock[0] = (uint16_t)(get_bus_voltage_uv() >> 16);
- *          StatusBlock[1] = (uint16_t)(get_bus_voltage_uv() & 0xFFFF);
+ *  地址范围: 0x0040 ~ 0x0054（共 21 个寄存器，后 29 个预留扩展）
+ *
+ *  寄存器布局（由 UpdateModbusRegisters() 在 App/src/protocol.cpp 中填充）:
+ *
+ *  Addr    字节  内容                INA228 API                 Modbus 读取方式
+ *  ─────── ──── ─────────────────── ───────────────────────── ───────────────────
+ *  0x0040  4    Bus Voltage  (uV)   getBusVoltage_mV() * 1000  2 个 uint16（大端）
+ *  0x0042  4    Shunt Voltage (uV)  getShuntVoltage_uV()       2 个 uint16（大端）
+ *  0x0044  4    Current       (mA)  getCurrent_mA()             2 个 uint16（大端）
+ *  0x0046  4    Power         (mW)  getPower_mW()               2 个 uint16（大端）
+ *  0x0048  4    Temperature   (mC)  getTemperature_mC()         2 个 uint16（大端）
+ *  0x004A  8    Energy        (mJ)  getEnergy_mJ()              4 个 uint16（大端）
+ *  0x004E  8    Charge        (mC)  getCharge_mC()              4 个 uint16（大端）
+ *  0x0052  2    Manufacturer ID      getManufacturerID()         1 个 uint16
+ *  0x0053  2    Device ID            getDeviceID()               1 个 uint16
+ *  0x0054  2    Alert Flags          readDiagAlertRaw()          1 个 uint16
+ *  0x0055+      Reserved（预留扩展）                            —
+ *
+ *  Modbus 主站读取示例:
+ *    01 04 00 40 00 0A  → 读 0x0040 起 10 个寄存器（BusV + ShuntV + Cur + Pwr + Temp）
+ *    01 04 00 4A 00 08  → 读 0x004A 起 8 个寄存器（Energy + Charge）
+ *    01 04 00 52 00 03  → 读 0x0052 起 3 个寄存器（MfrID + DevID + Alert）
  */
 uint16_t StatusBlock[50];
 

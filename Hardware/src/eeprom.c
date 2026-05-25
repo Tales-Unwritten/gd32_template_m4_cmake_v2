@@ -1,4 +1,4 @@
-#include "../Hardware/inc/eeprom.h"
+#include "eeprom.h"
 
 I2C_Info eepron_info;
 

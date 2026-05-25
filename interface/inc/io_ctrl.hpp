@@ -5,103 +5,115 @@
 
 #ifdef __cplusplus
 
+/**
+ * @brief  GPIO 单引脚管理类（非模板、零堆分配）
+ *
+ * - 构造时绑定端口+引脚，init() 后可用
+ * - 禁止拷贝，允许移动（移动后源对象失效）
+ * - 所有位操作通过 BOP/BC/TG 寄存器，硬件级原子
+ * - 断言仅在 Debug 生效；Release 下通过返回值/早期返回保证安全
+ */
 class io_ctrl
 {
 public:
-    /**
-     * @brief  构造：绑定 GPIO 端口与引脚
-     * @param  gpio_periph  GPIO 端口外设 (GPIOA ~ GPIOG)
-     * @param  pin          单引脚掩码 (GPIO_PIN_0 ~ GPIO_PIN_15)
-     */
     explicit io_ctrl(uint32_t gpio_periph, uint32_t pin);
     ~io_ctrl();
 
-    // 禁止拷贝，避免意外重复管理同一引脚
-    io_ctrl(const io_ctrl &) = delete;
+    io_ctrl(const io_ctrl &)            = delete;
     io_ctrl &operator=(const io_ctrl &) = delete;
 
-    // 允许移动，转移引脚所有权
     io_ctrl(io_ctrl &&other) noexcept;
     io_ctrl &operator=(io_ctrl &&other) noexcept;
 
+    // ── 生命周期 ──────────────────────────────────────────
+
     /**
-     * @brief  初始化 GPIO 引脚
-     * @param  mode   GPIO_MODE_INPUT / GPIO_MODE_OUTPUT /
-     *               GPIO_MODE_AF / GPIO_MODE_ANALOG
-     * @param  pull   GPIO_PUPD_NONE / GPIO_PUPD_PULLUP / GPIO_PUPD_PULLDOWN
-     * @param  otype  GPIO_OTYPE_PP / GPIO_OTYPE_OD（仅输出/AF模式有效）
-     * @param  speed  GPIO_OSPEED_2MHZ ~ GPIO_OSPEED_MAX（仅输出/AF模式有效）
+     * @brief 初始化 GPIO 引脚（调用前必须未初始化）
+     * @param mode   GPIO_MODE_INPUT / OUTPUT / AF / ANALOG
+     * @param pull   GPIO_PUPD_NONE / PULLUP / PULLDOWN
+     * @param otype  GPIO_OTYPE_PP / OD（仅输出/AF 有效）
+     * @param speed  GPIO_OSPEED_2MHZ ~ MAX（仅输出/AF 有效）
      */
     void init(uint32_t mode,
-              uint32_t pull   = GPIO_PUPD_NONE,
-              uint8_t  otype  = GPIO_OTYPE_PP,
-              uint32_t speed  = GPIO_OSPEED_50MHZ);
+              uint32_t pull  = GPIO_PUPD_NONE,
+              uint8_t  otype = GPIO_OTYPE_PP,
+              uint32_t speed = GPIO_OSPEED_50MHZ);
 
-    /**
-     * @brief  重新配置已初始化的引脚（模式切换）
-     * @note   不需要先 deinit，直接调用即可覆盖当前配置
-     */
+    /** @brief 重新配置已初始化引脚的模式（不必先 deinit） */
     void reinit(uint32_t mode,
-                uint32_t pull   = GPIO_PUPD_NONE,
-                uint8_t  otype  = GPIO_OTYPE_PP,
-                uint32_t speed  = GPIO_OSPEED_50MHZ);
+                uint32_t pull  = GPIO_PUPD_NONE,
+                uint8_t  otype = GPIO_OTYPE_PP,
+                uint32_t speed = GPIO_OSPEED_50MHZ);
 
-    /**
-     * @brief  反初始化引脚，恢复为模拟输入（最低功耗态）
-     * @note   调用后对象回到未初始化状态，可再次调用 init()
-     */
+    /** @brief 反初始化，恢复为模拟输入（最低功耗），可再次 init() */
     void deinit();
 
+    // ── 独立属性修改（仅已初始化时有效） ──────────────────
+
+    /** @brief 修改上/下拉（输入/输出/AF 均有效） */
+    void set_pull(uint32_t pull);
+
+    /** @brief 修改输出速度（仅输出/AF 有效） */
+    void set_speed(uint32_t speed);
+
+    /** @brief 修改输出类型（仅输出/AF 有效） */
+    void set_otype(uint8_t otype);
+
+    // ── 复用功能 ──────────────────────────────────────────
+
     /**
-     * @brief  设置复用功能编号
-     * @param  alt_func_num  GPIO_AF0 ~ GPIO_AF15
-     * @note   仅在 AF 模式下有意义，其他模式下断言失败
+     * @brief 设置复用功能编号（GPIO_AF0 ~ GPIO_AF15）
+     * @note  可在 init() 之后任意时刻调用；通常搭配 AF 模式使用。
+     *        若在非 AF 模式下设置，后续 reinit() 为 AF 时即刻生效。
      */
     void set_af(uint32_t alt_func_num);
 
-    /**
-     * @brief  锁定引脚配置，锁定后仅系统复位可解除
-     */
+    // ── 锁定 ──────────────────────────────────────────────
+
+    /** @brief 锁定引脚配置（仅系统复位解除） */
     void lock();
 
-    // ── 输出控制 ──────────────────────────────────────────
-    /** @brief 置位引脚（输出高电平） */
+    // ── 输出（BOP/BC 寄存器，硬件级原子） ─────────────────
+
     void high();
-    /** @brief 清零引脚（输出低电平） */
     void low();
-    /** @brief 翻转引脚电平（中断安全） */
-    void toggle();
-    /** @brief 便捷方法：true=高, false=低 */
-    void set(bool value);
-    /** @brief 写入指定电平 */
+    void toggle();                    // TG 寄存器写入，原子无需关中断
+    void set(bool value);             // true=high, false=low
     void write(bit_status bit_value);
 
-    // ── 输入读取 ──────────────────────────────────────────
-    /** @brief  读取引脚实际电平（适用于任何模式） */
-    [[nodiscard]] FlagStatus read();
-    /** @brief  读取输出锁存器状态（仅输出/AF模式有意义） */
-    [[nodiscard]] FlagStatus read_output();
+    // ── 输入 ──────────────────────────────────────────────
 
-    // ── 状态查询 ──────────────────────────────────────────
+    [[nodiscard]] FlagStatus read();         // ISTAT，任意模式有效
+    [[nodiscard]] FlagStatus read_output();  // OCTL，输出/AF 模式有效
+
+    // ── 查询 ──────────────────────────────────────────────
+
     [[nodiscard]] bool     is_initialized() const noexcept { return _initialized; }
     [[nodiscard]] uint32_t port()           const noexcept { return _gpio_periph; }
     [[nodiscard]] uint32_t pin()            const noexcept { return _pin; }
     [[nodiscard]] uint32_t mode()           const noexcept { return _mode; }
 
+    /** @brief 快速判初始化，支持 if(pin) 写法 */
+    [[nodiscard]] explicit operator bool() const noexcept { return _initialized; }
+
 private:
     uint32_t _gpio_periph;
     uint32_t _pin;
-    uint32_t _mode;         // 当前配置的模式，用于运行时安全检查
+    uint32_t _mode;
+    uint8_t  _otype;       // 缓存的输出类型，供 set_speed 保持
+    uint32_t _speed;       // 缓存的输出速度，供 set_otype 保持
     bool     _initialized;
 
-    /** @brief 未初始化时的模式占位值 */
     static constexpr uint32_t MODE_UNSET = 0xFFFFFFFF;
+    static constexpr uint8_t  OTYPE_DEF  = GPIO_OTYPE_PP;
+    static constexpr uint32_t SPEED_DEF  = GPIO_OSPEED_50MHZ;
 
-    /** @brief 使能端口时钟（幂等，多次调用安全） */
     void _enable_clock();
-
-    /** @brief 应用 GPIO 配置并更新内部模式记录 */
     void _apply(uint32_t mode, uint32_t pull, uint8_t otype, uint32_t speed);
+
+    /** @brief Release 安全的状态检查（断言之外的第二道防线） */
+    [[nodiscard]] bool _check_init() const noexcept { return _initialized; }
+    [[nodiscard]] bool _check_out()  const noexcept { return _initialized && (_mode == GPIO_MODE_OUTPUT || _mode == GPIO_MODE_AF); }
 };
 
 #endif /* __cplusplus */

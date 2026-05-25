@@ -3,56 +3,79 @@
 
 #include <cstdint>
 #include <cstdio>
-#include <set>
 
 // ============================================================
-// Constructor
+//  构造
 // ============================================================
 
-INA228::INA228(device_i2c_bus* bus,
-               uint8_t addr)
+INA228::INA228(device_i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
+    , _alertPin(nullptr)
 {
     _currentLSB_uA = _cfg.maxCurrent_mA * 1000 >> 19;
 }
 
-INA228::INA228(device_i2c_bus* bus,
-               uint8_t addr,
-               const Config& cfg)
+INA228::INA228(device_i2c_bus* bus, uint8_t addr, const Config& cfg)
     : _dev(bus, addr)
     , _cfg(cfg)
+    , _alertPin(nullptr)
 {
     _currentLSB_uA = _cfg.maxCurrent_mA * 1000 >> 19;
 }
 
+INA228::~INA228()
+{
+}
+
 // ============================================================
-// Init
+//  init
 // ============================================================
 
 void INA228::init()
 {
-    writeRaw(REG_CONFIG,
-             buildConfigReg(),
-             2);
+    // 1. 配置寄存器
+    writeRaw(REG_CONFIG,     buildConfigReg(),    2);
+    writeRaw(REG_ADC_CONFIG, buildADCConfigReg(), 2);
 
-    writeRaw(REG_ADC_CONFIG,
-             buildADCConfigReg(),
-             2);
-    writeRaw(REG_DIAG_ALERT,
-             buildDiagConfigReg(),
-             2);
+    // 2. 报警配置（ALATCH=1 使能锁存，此后状态位将被锁存）
+    writeRaw(REG_DIAG_ALERT, buildDiagAlertCfg(), 2);
 
-    writeRaw(REG_SHUNT_CAL,
-             _cfg.shuntCal,
-             2);
-    set_sovl_limit_mA(100);
-    // set_suvl_limit_mA(70);
-    set_bovl_limit_mV(12000);
-    set_buvl_limit_mV(8000);
+    // 3. 校准
+    writeRaw(REG_SHUNT_CAL,  _cfg.shuntCal, 2);
+
+    // 4. ⚠️ 上电后 MEMSTAT(bit0) 被芯片内部自检置 1，与寄存器写入顺序无关。
+    //    INA228 开漏 ALERT 引脚在锁存模式下只要状态位非零就持续拉低，
+    //    即使外部有上拉电阻也拉不回来。读取 DIAG_ALRT 是唯一清除手段。
+    //    因此 init 末尾必须读一次，将上电锁存标志清掉以释放 ALERT 引脚。
+    //    修复前缺少此读操作，导致主电源电路一直被 ALERT 拉低无法导通。
+    (void)readRaw(REG_DIAG_ALERT);
+
+    // 5. 阈值默认不触发，用户调用 set_xxx_limit() 覆盖
+
+    // 6. 自动配置报警引脚（Config 中指定了 GPIO 端口和引脚时）
+    //    零堆分配：直接用 GPIO 寄存器，不创建 io_ctrl 对象
+    if (_cfg.alert_port != 0 && _cfg.alert_pin != 0)
+    {
+        _alertPort    = _cfg.alert_port;
+        _alertPinMask = _cfg.alert_pin;
+
+        // 使能 GPIO 时钟
+        if      (_alertPort == GPIOA) rcu_periph_clock_enable(RCU_GPIOA);
+        else if (_alertPort == GPIOB) rcu_periph_clock_enable(RCU_GPIOB);
+        else if (_alertPort == GPIOC) rcu_periph_clock_enable(RCU_GPIOC);
+        else if (_alertPort == GPIOD) rcu_periph_clock_enable(RCU_GPIOD);
+        else if (_alertPort == GPIOE) rcu_periph_clock_enable(RCU_GPIOE);
+        else if (_alertPort == GPIOF) rcu_periph_clock_enable(RCU_GPIOF);
+        else if (_alertPort == GPIOG) rcu_periph_clock_enable(RCU_GPIOG);
+
+        // 开漏 ALERT → 输入 + 上拉
+        gpio_mode_set(_alertPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, _alertPinMask);
+        _alertCfg = true;
+    }
 }
 
 // ============================================================
-// Register Length
+//  寄存器长度
 // ============================================================
 
 uint8_t INA228::regLen(uint8_t reg)
@@ -75,12 +98,10 @@ uint8_t INA228::regLen(uint8_t reg)
 }
 
 // ============================================================
-// Raw IO
+//  Raw I2C IO
 // ============================================================
 
-void INA228::writeRaw(uint8_t reg,
-                      uint64_t data,
-                      uint8_t len)
+void INA228::writeRaw(uint8_t reg, uint64_t data, uint8_t len)
 {
     _dev.i2c_freedom_write(reg, data, len);
 }
@@ -88,380 +109,294 @@ void INA228::writeRaw(uint8_t reg,
 uint64_t INA228::readRaw(uint8_t reg)
 {
     uint64_t data = 0;
-
-    _dev.i2c_freedom_read(reg,
-                          &data,
-                          regLen(reg));
-
+    _dev.i2c_freedom_read(reg, &data, regLen(reg));
     return data;
 }
 
 // ============================================================
-// Register Build
+//  寄存器构建
 // ============================================================
 
 uint16_t INA228::buildConfigReg() const
 {
     uint16_t r = 0;
-
-    r |= static_cast<uint16_t>(_cfg.reset) << 15;
-    r |= static_cast<uint16_t>(_cfg.retacc) << 14;
-    r |= static_cast<uint16_t>(_cfg.convdly) << 6;
+    r |= static_cast<uint16_t>(_cfg.reset)    << 15;
+    r |= static_cast<uint16_t>(_cfg.retacc)   << 14;
+    r |= static_cast<uint16_t>(_cfg.convdly)  << 6;
     r |= static_cast<uint16_t>(_cfg.tempcomp) << 5;
     r |= static_cast<uint16_t>(_cfg.adcrange) << 4;
     r |= static_cast<uint16_t>(_cfg.reserved) << 0;
-
     return r;
 }
 
 uint16_t INA228::buildADCConfigReg() const
 {
     uint16_t r = 0;
-
-    r |= static_cast<uint16_t>(_cfg.adcMode) << 12;
-
-    r |= static_cast<uint16_t>(_cfg.busConvTime) << 9;
-
+    r |= static_cast<uint16_t>(_cfg.adcMode)       << 12;
+    r |= static_cast<uint16_t>(_cfg.busConvTime)   << 9;
     r |= static_cast<uint16_t>(_cfg.shuntConvTime) << 6;
-
-    r |= static_cast<uint16_t>(_cfg.tempConvTime) << 3;
-
+    r |= static_cast<uint16_t>(_cfg.tempConvTime)  << 3;
     r |= static_cast<uint16_t>(_cfg.averaging);
-
     return r;
 }
 
-uint16_t INA228::buildDiagConfigReg() const
+uint16_t INA228::buildDiagAlertCfg() const
 {
+    // ⚠️ 仅写 bit 15-8（配置位）
+    // bit 7-0 是只读状态位，写入 0 可清除锁存标志
     uint16_t r = 0;
-
-    r |= static_cast<uint16_t>(_cfg.alatch) << 15;
-    r |= static_cast<uint16_t>(_cfg.cnvr) << 14;
+    r |= static_cast<uint16_t>(_cfg.alatch)    << 15;
+    r |= static_cast<uint16_t>(_cfg.cnvr)      << 14;
     r |= static_cast<uint16_t>(_cfg.slowalert) << 13;
-    r |= static_cast<uint16_t>(_cfg.apol) << 12;
-    r |= static_cast<uint16_t>(_cfg.energyof) << 11;
-    r |= static_cast<uint16_t>(_cfg.chargeof) << 10;
-    r |= static_cast<uint16_t>(_cfg.mathof) << 9;
-    r |= static_cast<uint16_t>(_cfg.dig_reserved) << 8;
-    r |= static_cast<uint16_t>(_cfg.tmpol) << 7;
-    r |= static_cast<uint16_t>(_cfg.shntol) << 6;
-    r |= static_cast<uint16_t>(_cfg.shntul) << 5;
-    r |= static_cast<uint16_t>(_cfg.vbus_ol) << 4;
-    r |= static_cast<uint16_t>(_cfg.vbus_ul) << 3;
-    r |= static_cast<uint16_t>(_cfg.pow_ol) << 2;
-    r |= static_cast<uint16_t>(_cfg.cnvrf) << 1;
-    r |= static_cast<uint16_t>(_cfg.menstat) << 0;
+    r |= static_cast<uint16_t>(_cfg.apol)      << 12;
     return r;
 }
 
 // ============================================================
-// Convert
+//  原始值 → 物理量
 // ============================================================
 
 int32_t INA228::rawToBusVoltage_mV(uint64_t raw)
 {
-    /*
-        Bus Voltage LSB:195.3125uV = 1953125 / 10000 uV
-        转 mV: value * 1953125 / 10000000
-        近似优化：195.3125uV = 25 / 128 mV
-        所以：mV = value * 25 >> 7
-    */
-    int32_t val =
-        signExtend<20>(raw >> 4);
-
+    // 195.3125 µV/LSB = 25/128 mV/LSB
+    int32_t val = signExtend<20>(raw >> 4);
     return (val * 25) >> 7;
 }
 
 int32_t INA228::rawToShuntVoltage_uV(uint64_t raw)
 {
-    /*
-        312.5nV = 5 / 16 uV
-    */
-
-    int32_t val =
-        signExtend<20>(raw >> 4);
-
+    // 312.5 nV/LSB = 5/16 µV/LSB (ADCRANGE=0)
+    int32_t val = signExtend<20>(raw >> 4);
     return (val * 5) >> 4;
 }
 
 int32_t INA228::rawToCurrent_mA(uint64_t raw) const
 {
-    int32_t val =
-        signExtend<20>(raw >> 4);
-
-    /*
-        current_uA =
-            raw * currentLSB_uA
-
-        转 mA:
-            /1000
-    */
-
+    int32_t val = signExtend<20>(raw >> 4);
     return (val * _currentLSB_uA) / 1000;
 }
 
 int32_t INA228::rawToTemperature_mC(uint64_t raw)
 {
-    /*
-        7.8125m°C
-
-        = 1/128 °C
-
-        转 m°C:
-
-        1000 / 128
-    */
-
-    uint16_t val =
-        static_cast<uint16_t>(raw);
-
+    // 7.8125 m°C/LSB = 1000/128 m°C/LSB
+    uint16_t val = static_cast<uint16_t>(raw);
     return (val * 1000) >> 7;
 }
 
-int32_t INA228::rawToPower_mW(uint64_t raw) const {
-  /*
-      Power LSB:Power_LSB(W) = 3.2 × Current_LSB(A)
-      3.2 = 16/5
-      power_W  = raw × 16/5 × Current_LSB_A
-               = raw × 16/5 × (currentLSB_uA / 1000000)
-      power_mW = power_W × 1000
-               = raw × 16 × currentLSB_uA / 5000
-  */
-
-  int64_t val = static_cast<int64_t>(raw);
-
-  return static_cast<int32_t>((val * 16 * _currentLSB_uA) / 5000);
+int32_t INA228::rawToPower_mW(uint64_t raw) const
+{
+    // Power(W) = 3.2 × CURRENT_LSB × reg
+    // Power(mW) = reg × 3.2 × _currentLSB_uA / 1000
+    //           = reg × 16 × _currentLSB_uA / 5000
+    int64_t val = static_cast<int64_t>(raw);
+    return static_cast<int32_t>((val * 16 * _currentLSB_uA) / 5000);
 }
 
 int64_t INA228::rawToEnergy_mJ(uint64_t raw) const
 {
-    /*
-        Energy[J] = 16 × 3.2 × CURRENT_LSB × ENERGY
-                  = 51.2 × Current_LSB_A × ENERGY_reg
-        51.2 = 256/5
-        Energy_mJ = Energy_J × 1000
-                  = ENERGY_reg × 256 × currentLSB_uA / 5000
-                  = ENERGY_reg × 32 × currentLSB_uA / 625
-    */
-
+    // Energy(J) = 16 × 3.2 × CURRENT_LSB × reg
+    // Energy(mJ) = reg × 32 × _currentLSB_uA / 625
     int64_t val = signExtend<40>(raw);
-
     return (val * 32 * _currentLSB_uA) / 625;
 }
 
 int64_t INA228::rawToCharge_mC(uint64_t raw) const
 {
-    /*
-        Charge[C] = CURRENT_LSB × CHARGE
-        Charge_mC = Charge_C × 1000
-                  = CHARGE_reg × currentLSB_uA / 1000
-    */
-
+    // Charge(C) = CURRENT_LSB × reg
+    // Charge(mC) = reg × _currentLSB_uA / 1000
     int64_t val = signExtend<40>(raw);
-
     return (val * _currentLSB_uA) / 1000;
 }
 
 // ============================================================
-// Public API
+//  测量 API
 // ============================================================
 
 int32_t INA228::getBusVoltage_mV()
-{
-    return rawToBusVoltage_mV(
-        readRaw(REG_VBUS));
-}
+    { return rawToBusVoltage_mV(readRaw(REG_VBUS)); }
 
 int32_t INA228::getShuntVoltage_uV()
-{
-    return rawToShuntVoltage_uV(
-        readRaw(REG_VSHUNT));
-}
+    { return rawToShuntVoltage_uV(readRaw(REG_VSHUNT)); }
 
 int32_t INA228::getCurrent_mA()
-{
-    return rawToCurrent_mA(
-        readRaw(REG_CURRENT));
-}
+    { return rawToCurrent_mA(readRaw(REG_CURRENT)); }
 
 int32_t INA228::getTemperature_mC()
-{
-    return rawToTemperature_mC(
-        readRaw(REG_DIETEMP));
-}
+    { return rawToTemperature_mC(readRaw(REG_DIETEMP)); }
 
 int32_t INA228::getPower_mW()
-{
-    return rawToPower_mW(
-        readRaw(REG_POWER));
-}
+    { return rawToPower_mW(readRaw(REG_POWER)); }
 
 int64_t INA228::getEnergy_mJ()
-{
-    return rawToEnergy_mJ(
-        readRaw(REG_ENERGY));
-}
+    { return rawToEnergy_mJ(readRaw(REG_ENERGY)); }
 
 int64_t INA228::getCharge_mC()
-{
-    return rawToCharge_mC(
-        readRaw(REG_CHARGE));
-}
+    { return rawToCharge_mC(readRaw(REG_CHARGE)); }
 
+// ============================================================
+//  阈值配置
+// ============================================================
 
-/*
- * 设置分流过压保护阈值 (SOVL)
- *
- * sovl_mA:   过流阈值，单位 mA
- * 依赖:      _cfg.r_shunt_uOhm（采样电阻，单位 µΩ）
- *
- * 转换流程:  mA × µΩ = nV → µV → ÷LSB → 寄存器编码
- */
 void INA228::set_sovl_limit_mA(int32_t sovl_mA)
 {
-    /*
-     * 第一步：电流(mA) → 分流电压(µV)
-     *
-     * 单位推导：mA × µΩ = 10^-3 A × 10^-6 Ω = 10^-9 V = nV
-     *          nV / 1000 = µV
-     * 示例：10000mA × 2000µΩ = 20000000nV = 20000µV (即20mV)
-     *
-     * 使用 int64_t 防止乘法溢出
-     * （极端情况：200000mA × 5000µΩ = 10^9，接近 int32 上限）
-     */
-    int64_t voltage_uV =                                          // 分流电压，µV
+    int64_t voltage_uV =
         (static_cast<int64_t>(sovl_mA) *
-         static_cast<int64_t>(_cfg.r_shunt_uOhm)) / 1000;        // mA×µΩ=nV, ÷1000→µV
+         static_cast<int64_t>(_cfg.r_shunt_uOhm)) / 1000;
 
-    /*
-     * 第二步：µV → SOVL 寄存器编码
-     *
-     * reg = 电压 / LSB
-     * ADCRANGE=0: LSB = 5µV,    除法即可
-     * ADCRANGE=1: LSB = 1.25µV, 等价 ×4÷5（避免浮点，M0/M3 通常无 FPU）
-     */
     int32_t reg_value = 0;
+    if (_cfg.adcrange == Adcrange::Range_163mv)
+        reg_value = voltage_uV / 5;
+    else
+        reg_value = (voltage_uV * 4) / 5;
 
-    if (_cfg.adcrange == Adcrange::Range_163mv) {
-        reg_value = voltage_uV / 5;                               // 5µV/LSB
-    } else {
-        reg_value = (voltage_uV * 4) / 5;                         // 1.25µV/LSB = 5/4µV
-    }
-
-    // 钳位到 int16 范围 (-32768 ~ 32767)，防止写入时高位截断
     if (reg_value > INT16_MAX)  reg_value = INT16_MAX;
     if (reg_value < INT16_MIN)  reg_value = INT16_MIN;
 
-    // 写入寄存器（16-bit 二进制补码，cast 保留原始位模式）
     writeRaw(REG_SOVL, static_cast<uint16_t>(reg_value), 2);
 }
 
-
-/*
- * 设置分流欠压保护阈值 (SUVL)
- *
- * suvl_mA:   欠流阈值，单位 mA
- * 依赖:      _cfg.r_shunt_uOhm（采样电阻，单位 µΩ）
- *
- * 转换流程:  mA × µΩ = nV → µV → ÷LSB → 寄存器编码
- *
- * 注：SUVL 复位值 0x8000（int16 最小值），即默认关闭欠压检测
- */
 void INA228::set_suvl_limit_mA(int32_t suvl_mA)
 {
-    // 第一步：电流(mA) → 分流电压(µV)
-    int64_t voltage_uV =                                          // 分流电压，µV
+    int64_t voltage_uV =
         (static_cast<int64_t>(suvl_mA) *
-         static_cast<int64_t>(_cfg.r_shunt_uOhm)) / 1000;        // mA×µΩ=nV, ÷1000→µV
+         static_cast<int64_t>(_cfg.r_shunt_uOhm)) / 1000;
 
-    // 第二步：µV → SUVL 寄存器编码
     int32_t reg_value = 0;
+    if (_cfg.adcrange == Adcrange::Range_163mv)
+        reg_value = voltage_uV / 5;
+    else
+        reg_value = (voltage_uV * 4) / 5;
 
-    if (_cfg.adcrange == Adcrange::Range_163mv) {
-        reg_value = voltage_uV / 5;                               // 5µV/LSB
-    } else {
-        reg_value = (voltage_uV * 4) / 5;                         // 1.25µV/LSB = 5/4µV
-    }
-
-    // 钳位到 int16 范围 (-32768 ~ 32767)
     if (reg_value > INT16_MAX)  reg_value = INT16_MAX;
     if (reg_value < INT16_MIN)  reg_value = INT16_MIN;
 
-    // 写入寄存器（16-bit 二进制补码）
     writeRaw(REG_SUVL, static_cast<uint16_t>(reg_value), 2);
 }
 
-
-/*
- * 设置总线过压保护阈值 (BOVL)
- *
- * bovl_mV:   过压阈值，单位 mV
- *
- * BOVL 寄存器：15-bit 无符号（bit15 保留为0），仅限正值
- * 转换因子：3.125mV/LSB = 25/8 mV/LSB
- * 为避免浮点：÷3.125 = ×8÷25
- * 钳位上限：0x7FFF（15-bit 无符号最大值，对应约 102.4V）
- */
 void INA228::set_bovl_limit_mV(uint16_t bovl_mV)
 {
-    // mV → 寄存器编码：÷3.125 = ×8÷25
+    // 3.125 mV/LSB → reg = mV × 8 / 25
     int32_t reg_value = (static_cast<int32_t>(bovl_mV) * 8) / 25;
-
-    // 钳位到 15-bit 无符号范围 (0 ~ 0x7FFF)，bit15 保留必须为 0
     if (reg_value > 0x7FFF)  reg_value = 0x7FFF;
     if (reg_value < 0)       reg_value = 0;
-
     writeRaw(REG_BOVL, static_cast<uint16_t>(reg_value), 2);
 }
 
 void INA228::set_buvl_limit_mV(uint16_t buvl_mV)
 {
-    // mV → 寄存器编码：÷3.125 = ×8÷25
     int32_t reg_value = (static_cast<int32_t>(buvl_mV) * 8) / 25;
-
-    // 钳位到 15-bit 无符号范围 (0 ~ 0x7FFF)，bit15 保留必须为 0
     if (reg_value > 0x7FFF)  reg_value = 0x7FFF;
     if (reg_value < 0)       reg_value = 0;
-
     writeRaw(REG_BUVL, static_cast<uint16_t>(reg_value), 2);
 }
 
-
-
-void INA228::set_temp_limit_C(uint16_t temp_mC)
+void INA228::set_temp_limit_C(uint8_t temp_C)
 {
+    // 7.8125 m°C/LSB = 1/128 °C/LSB  →  reg = temp_C × 128
+    uint16_t reg_value = static_cast<uint16_t>(temp_C) << 7;
+    writeRaw(REG_TEMP_LIMIT, reg_value, 2);
 }
 
 void INA228::set_pwr_limit_mW(uint32_t pwr_mW)
 {
-}
+    // Power(mW) = reg × 16 × _currentLSB_uA / 5000
+    // → reg = pwr_mW × 5000 / (16 × _currentLSB_uA)
+    if (_currentLSB_uA == 0) return;
 
-void INA228::unlock()
-{
-    readRaw(REG_DIAG_ALERT);
+    uint64_t num = static_cast<uint64_t>(pwr_mW) * 5000;
+    uint32_t den = static_cast<uint32_t>(_currentLSB_uA) * 16;
+    uint16_t reg_value = static_cast<uint16_t>(num / den);
+
+    writeRaw(REG_PWR_LIMIT, reg_value, 2);
 }
 
 // ============================================================
-// Device Info
+//  报警引脚 / 标志
+// ============================================================
+
+void INA228::bindAlertPin(io_ctrl *pin)
+{
+    _alertPin = pin;
+}
+
+bool INA228::isAlertAsserted()
+{
+    // 优先使用 bindAlertPin 绑定的外部引脚
+    if (_alertPin)
+        return _alertPin->read() == RESET;
+
+    // 否则使用自动配置的引脚
+    if (_alertCfg)
+        return gpio_input_bit_get(_alertPort, _alertPinMask) == RESET;
+
+    return false;
+}
+
+INA228_AlertFlags INA228::readAlertFlags()
+{
+    INA228_AlertFlags f = {};
+    uint16_t raw = static_cast<uint16_t>(readRaw(REG_DIAG_ALERT));
+
+    f.memStatus       = (raw & 0x0001) != 0;
+    f.conversionReady = (raw & 0x0002) != 0;
+    f.powerOverLimit  = (raw & 0x0004) != 0;
+    f.busUnderLimit   = (raw & 0x0008) != 0;
+    f.busOverLimit    = (raw & 0x0010) != 0;
+    f.shuntUnderLimit = (raw & 0x0020) != 0;
+    f.shuntOverLimit  = (raw & 0x0040) != 0;
+    f.tempOverLimit   = (raw & 0x0080) != 0;
+    f.mathOverflow    = (raw & 0x0200) != 0;
+    f.chargeOverflow  = (raw & 0x0400) != 0;
+    f.energyOverflow  = (raw & 0x0800) != 0;
+
+    return f;
+}
+
+void INA228::clearAlertLatch()
+{
+    // 连续读取两次：第一次清除锁存标志，第二次确认清除
+    (void)readRaw(REG_DIAG_ALERT);
+    uint16_t remain = static_cast<uint16_t>(readRaw(REG_DIAG_ALERT));
+
+    // 重新写入配置位，确保报警逻辑状态正确
+    writeRaw(REG_DIAG_ALERT, buildDiagAlertCfg(), 2);
+
+    // 如果仍有状态位残留，说明存在持续触发的条件
+    // （非锁存模式或硬件故障），此时 ALERT 会一直拉低
+    if (remain & 0x00FF)  // bit 7-0 有残留
+    {
+        // 可在此处设置断点排查具体残留位
+        (void)remain;
+    }
+}
+
+/**
+ * @brief 读取原始 DIAG_ALRT 寄存器值（调试用）
+ */
+uint16_t INA228::readDiagAlertRaw()
+{
+    return static_cast<uint16_t>(readRaw(REG_DIAG_ALERT));
+}
+
+// ============================================================
+//  设备信息
 // ============================================================
 
 uint16_t INA228::getManufacturerID()
 {
-    return static_cast<uint16_t>(
-        readRaw(REG_MANUFACTURER_ID));
+    return static_cast<uint16_t>(readRaw(REG_MANUFACTURER_ID));
 }
 
 uint16_t INA228::getDeviceID()
 {
-    return static_cast<uint16_t>(
-        readRaw(REG_DEVICE_ID));
+    return static_cast<uint16_t>(readRaw(REG_DEVICE_ID));
 }
 
 // ============================================================
-// Dump
+//  调试：Snapshot
 // ============================================================
 
-void INA228::captureSnapshot(Snapshot& s)
+void INA228::captureSnapshot(INA228_Snapshot& s)
 {
     s.config        = readRaw(REG_CONFIG);
     s.adcConfig     = readRaw(REG_ADC_CONFIG);
@@ -475,95 +410,91 @@ void INA228::captureSnapshot(Snapshot& s)
     s.energy        = readRaw(REG_ENERGY);
     s.charge        = readRaw(REG_CHARGE);
     s.sovl          = static_cast<uint16_t>(readRaw(REG_SOVL));
+    s.suvl          = static_cast<uint16_t>(readRaw(REG_SUVL));
     s.bovl          = static_cast<uint16_t>(readRaw(REG_BOVL));
+    s.buvl          = static_cast<uint16_t>(readRaw(REG_BUVL));
+    s.temp_limit    = static_cast<uint16_t>(readRaw(REG_TEMP_LIMIT));
+    s.pwr_limit     = static_cast<uint16_t>(readRaw(REG_PWR_LIMIT));
     s.manufacturerID = static_cast<uint16_t>(readRaw(REG_MANUFACTURER_ID));
     s.deviceID       = static_cast<uint16_t>(readRaw(REG_DEVICE_ID));
 }
 
-void INA228::dumpRawRegisters(const Snapshot& s)
+void INA228::dumpRawRegisters(const INA228_Snapshot& s)
 {
     char buf[128];
     int  len;
 
-    // ---- Header ----
     len = snprintf(buf, sizeof(buf),
                    "\r\n========== INA228 RAW ==========\r\n");
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- 16-bit Registers ----
-    len = snprintf(buf, sizeof(buf),
-                   "CONFIG         : 0x%04X\r\n", s.config);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "CONFIG         : 0x%04X\r\n", s.config);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "ADC_CONFIG     : 0x%04X\r\n", s.adcConfig);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "ADC_CONFIG     : 0x%04X\r\n", s.adcConfig);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "SHUNT_CAL      : 0x%04X\r\n", s.shuntCal);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "SHUNT_CAL      : 0x%04X\r\n", s.shuntCal);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "DIAG_ALERT     : 0x%04X\r\n", s.diagAlert);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "DIAG_ALERT     : 0x%04X\r\n", s.diagAlert);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "DIETEMP        : 0x%04X\r\n", s.temp);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "DIETEMP        : 0x%04X\r\n", s.temp);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "SOVL           : 0x%04X\r\n", s.sovl);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "SOVL           : 0x%04X\r\n", s.sovl);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "BOVL           : 0x%04X\r\n", s.bovl);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "SUVL           : 0x%04X\r\n", s.suvl);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- 24-bit Registers (stored in uint64_t, low 24 bits) ----
-    len = snprintf(buf, sizeof(buf),
-                   "VSHUNT         : 0x%06lX\r\n",
+    len = snprintf(buf, sizeof(buf), "BOVL           : 0x%04X\r\n", s.bovl);
+    debug_uart.send_data((const uint8_t*)buf, len);
+
+    len = snprintf(buf, sizeof(buf), "BUVL           : 0x%04X\r\n", s.buvl);
+    debug_uart.send_data((const uint8_t*)buf, len);
+
+    len = snprintf(buf, sizeof(buf), "TEMP_LIMIT     : 0x%04X\r\n", s.temp_limit);
+    debug_uart.send_data((const uint8_t*)buf, len);
+
+    len = snprintf(buf, sizeof(buf), "PWR_LIMIT      : 0x%04X\r\n", s.pwr_limit);
+    debug_uart.send_data((const uint8_t*)buf, len);
+
+    len = snprintf(buf, sizeof(buf), "VSHUNT         : 0x%06lX\r\n",
                    (unsigned long)(s.vshunt & 0xFFFFFF));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "VBUS           : 0x%06lX\r\n",
+    len = snprintf(buf, sizeof(buf), "VBUS           : 0x%06lX\r\n",
                    (unsigned long)(s.vbus & 0xFFFFFF));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "CURRENT        : 0x%06lX\r\n",
+    len = snprintf(buf, sizeof(buf), "CURRENT        : 0x%06lX\r\n",
                    (unsigned long)(s.current & 0xFFFFFF));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "POWER          : 0x%06lX\r\n",
+    len = snprintf(buf, sizeof(buf), "POWER          : 0x%06lX\r\n",
                    (unsigned long)(s.power & 0xFFFFFF));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- 40-bit Registers (split into high 8-bit + low 32-bit) ----
-    len = snprintf(buf, sizeof(buf),
-                   "ENERGY         : 0x%02lX%08lX\r\n",
+    len = snprintf(buf, sizeof(buf), "ENERGY         : 0x%02lX%08lX\r\n",
                    (unsigned long)((s.energy >> 32) & 0xFF),
                    (unsigned long)(s.energy & 0xFFFFFFFF));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "CHARGE         : 0x%02lX%08lX\r\n",
+    len = snprintf(buf, sizeof(buf), "CHARGE         : 0x%02lX%08lX\r\n",
                    (unsigned long)((s.charge >> 32) & 0xFF),
                    (unsigned long)(s.charge & 0xFFFFFFFF));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Device Info (16-bit) ----
-    len = snprintf(buf, sizeof(buf),
-                   "MANUFACTURER_ID: 0x%04X\r\n", s.manufacturerID);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "MANUFACTURER_ID: 0x%04X\r\n", s.manufacturerID);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    len = snprintf(buf, sizeof(buf),
-                   "DEVICE_ID      : 0x%04X\r\n", s.deviceID);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "DEVICE_ID      : 0x%04X\r\n", s.deviceID);
+    debug_uart.send_data((const uint8_t*)buf, len);
 }
 
-void INA228::dumpEngineeringData(const Snapshot& s)
+void INA228::dumpEngineeringData(const INA228_Snapshot& s)
 {
     char buf[128];
     int  len;
@@ -576,67 +507,44 @@ void INA228::dumpEngineeringData(const Snapshot& s)
     int64_t eng_mJ    = rawToEnergy_mJ(s.energy);
     int64_t chg_mC    = rawToCharge_mC(s.charge);
 
-    // ---- Header ----
     len = snprintf(buf, sizeof(buf),
                    "\r\n========== INA228 ENGINEERING ==========\r\n");
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Bus Voltage ----
-    len = snprintf(buf, sizeof(buf),
-                   "Bus Voltage    : %ld.%03ld V\r\n",
-                   vbus_mV / 1000,
-                   vbus_mV % 1000);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "Bus Voltage    : %ld.%03ld V\r\n",
+                   (long)vbus_mV / 1000, (long)vbus_mV % 1000);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Shunt Voltage ----
-    len = snprintf(buf, sizeof(buf),
-                   "Shunt Voltage  : %ld uV\r\n",
-                   vshunt_uV);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "Shunt Voltage  : %ld uV\r\n", (long)vshunt_uV);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Temperature ----
-    len = snprintf(buf, sizeof(buf),
-                   "Temperature    : %ld.%03ld C\r\n",
-                   temp_mC / 1000,
-                   temp_mC % 1000);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "Temperature    : %ld.%03ld C\r\n",
+                   (long)temp_mC / 1000, (long)temp_mC % 1000);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Current ----
-    len = snprintf(buf, sizeof(buf),
-                   "Current        : %ld.%03ld A\r\n",
-                   cur_mA / 1000,
-                   cur_mA % 1000);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "Current        : %ld.%03ld A\r\n",
+                   (long)cur_mA / 1000, (long)cur_mA % 1000);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Power ----
-    len = snprintf(buf, sizeof(buf),
-                   "Power          : %ld.%03ld W\r\n",
-                   pwr_mW / 1000,
-                   pwr_mW % 1000);
-    debug_send_data((uint8_t*)buf, len);
+    len = snprintf(buf, sizeof(buf), "Power          : %ld.%03ld W\r\n",
+                   (long)pwr_mW / 1000, (long)pwr_mW % 1000);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Energy (mJ → split as J.mJ) ----
-    len = snprintf(buf, sizeof(buf),
-                   "Energy         : %ld.%03ld J\r\n",
+    len = snprintf(buf, sizeof(buf), "Energy         : %ld.%03ld J\r\n",
                    (long)(eng_mJ / 1000),
                    (long)((eng_mJ % 1000) < 0 ? -(eng_mJ % 1000) : (eng_mJ % 1000)));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 
-    // ---- Charge (mC → split as C.mC) ----
-    len = snprintf(buf, sizeof(buf),
-                   "Charge         : %ld.%03ld C\r\n",
+    len = snprintf(buf, sizeof(buf), "Charge         : %ld.%03ld C\r\n",
                    (long)(chg_mC / 1000),
                    (long)((chg_mC % 1000) < 0 ? -(chg_mC % 1000) : (chg_mC % 1000)));
-    debug_send_data((uint8_t*)buf, len);
+    debug_uart.send_data((const uint8_t*)buf, len);
 }
 
 void INA228::dumpRegisters()
 {
-    Snapshot snap;
-
+    INA228_Snapshot snap;
     captureSnapshot(snap);
-
     dumpRawRegisters(snap);
-
     dumpEngineeringData(snap);
 }

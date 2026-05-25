@@ -2,73 +2,40 @@
   {
     "label": "Configure Debug",
     "command": "cmake --preset debug",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "$ZED_WORKTREE_ROOT"
   },
 
   {
     "label": "Build Debug",
     "command": "cmake --build --preset debug",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "$ZED_WORKTREE_ROOT"
   },
 
   {
     "label": "Flash DAPLink",
-    "command": "cmake --build --preset debug && cmake --build build/debug --target flash-daplink",
+    "command": "cmake --build build/debug --target flash-daplink",
     "cwd": "$ZED_WORKTREE_ROOT",
-    "shell": "system",
+    "shell": "system"
   },
 
   {
     "label": "Flash JLink",
-    "command": "cmake --build --preset debug && cmake --build build/debug --target flash-jlink",
+    "command": "cmake --build build/debug --target flash-jlink",
     "cwd": "$ZED_WORKTREE_ROOT",
-    "shell": "system",
+    "shell": "system"
   },
 
   {
     "label": "OpenOCD DAPLink",
     "command": "cmake --build build/debug --target debug",
     "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true,
+    "use_new_terminal": true
   },
 
   {
     "label": "OpenOCD JLink",
     "command": "cmake --build build/debug --target debug-jlink",
     "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true,
-  },
+    "use_new_terminal": true
+  }
 ]
-
-// [
-//   {
-//     "label": "Configure Debug",
-//     "command": "/bin/zsh -l -c 'cmake --preset debug'",
-//     "cwd": "$ZED_WORKTREE_ROOT",
-//   },
-//   {
-//     "label": "Build Debug",
-//     "command": "/bin/zsh -l -c 'cmake --build --preset debug'",
-//     "cwd": "$ZED_WORKTREE_ROOT",
-//   },
-//   {
-//     "label": "Flash DAPLink",
-//     "command": "/bin/zsh -l -c 'cmake --build --preset debug && cmake --build build/debug --target flash-daplink'",
-//     "cwd": "$ZED_WORKTREE_ROOT",
-//   },
-//   {
-//     "label": "Flash JLink",
-//     "command": "/bin/zsh -l -c 'cmake --build --preset debug && cmake --build build/debug --target flash-jlink'",
-//     "cwd": "$ZED_WORKTREE_ROOT",
-//   },
-//   {
-//     "label": "OpenOCD DAPLink",
-//     "command": "/bin/zsh -l -c 'cmake --build build/debug --target debug'",
-//     "cwd": "$ZED_WORKTREE_ROOT",
-//   },
-//   {
-//     "label": "OpenOCD JLink",
-//     "command": "/bin/zsh -l -c 'cmake --build build/debug --target debug-jlink'",
-//     "cwd": "$ZED_WORKTREE_ROOT",
-//   },
-// ]

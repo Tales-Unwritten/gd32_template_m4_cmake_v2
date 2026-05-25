@@ -1,0 +1,434 @@
+Product Folder
+Sample & Buy
+Technical Documents
+Tools & Software
+Support & Community
+Reference Design
+INA226
+ZHCS078A –JUNE 2011–REVISED AUGUST 2015
+INA226 高侧 / 低侧测量､
+双向电流 / 功率监视器，具有 I²C 兼容接口
+1 特性
+感测的总线电压范围：0V 至 36V
+高侧或低侧感测
+・
+报告电流､电压和功率
+・高精度:
+– 0.1% 增益误差 (最大值)
+– 10μV 偏移 (最大值)
+・可配置的取平均值选项
+・16 个可编程地址
+・由 2.7V 至 5.5V 电源供电
+・10 引脚 DGS 超薄小外形尺寸 (VSSOP) 封装
+2 应用范围
+・服务器
+・电信设备
+计算
+电源管理
+・
+电池充电器
+电源
+・
+测试设备
+3 说明
+INA226 是一款分流 / 功率监视器，具有 I²C 或
+SMBUS 兼容接口｡该器件监视分流压降和总线电源 电压｡可编程校准值､转换时间和取平均值功能与内 部乘法器相结合，可实现电流值 (单位为安培) 和功率 值 (单位为瓦) 的直接读取｡
+INA226 可在 0V 至 36V 的共模总线电压范围内感测电 流，与电源电压无关｡该器件由一个 2.7V 至 5.5V 的 单电源供电，电源电流典型值为 330μA｡该器件的额 定工作温度范围为–40°C 至 125°C,I2C 兼容接口上 具有多达 16 个可编程地址｡
+器件信息 (1)
+器件型号 封装 封装尺寸 (标称值)
+INA226 VSSOP (10) 3.00mm x 3.00mm
+(1) 如需了解所有可用封装，请见数据表末尾的可订购产品附录｡
+高侧或低侧感测应用
+0
+0
+0
+Power Supply (0 V to 36 V)
+C 0.1 F BYPASS
+VS (Supply Voltage)
+High-
+Side
+Shunt
+VBUS
+SDA
+SCL
+Power Register
+Load
+V
+I C or SMBus 2
+VIN+
+Current Register
+ADC
+Low-
+Shunt Side
+Interface
+Alert
+Voltage Register
+VIN–
+A0
+Alert Register
+A1
+GND
+An IMPORTANT NOTICE at the end of this data sheet addresses availability, warranty, changes, use in safety-critical applications, intellectual property matters and other important disclaimers. PRODUCTION DATA.
+English Data Sheet: SBOS547
+INA226 ZHCS078A –JUNE 2011–REVISED AUGUST 2015
+www.ti.com.cn
+目录
+1 特性.......................................................................... 1
+2 应用范围................................................................... 1
+3 说明.......................................................................... 1
+4 修订历史记录........................................................... 2
+5 Pin Configuration and Functions......................... 3
+6 Specifications......................................................... 4
+6.1 Absolute Maximum Ratings ...................................... 4
+6.2 ESD Ratings.............................................................. 4
+6.3 Recommended Operating Conditions....................... 4
+6.4 Thermal Information.................................................. 4
+6.5 Electrical Characteristics........................................... 5
+6.6 Typical Characteristics.............................................. 7
+7 Detailed Description ............................................ 10
+7.1 Overview ................................................................. 10
+7.2 Functional Block Diagram ....................................... 10
+7.3 Feature Description................................................. 10 7.4 Device Functional Modes........................................ 13
+7.5 Programming .......................................................... 15
+7.6 Register Maps......................................................... 21
+8 Application and Implementation ........................ 28
+8.1 Application Information............................................ 28
+8.2 Typical Applications ................................................ 28
+9 Power Supply Recommendations...................... 30
+10 Layout................................................................... 30
+10.1 Layout Guidelines ................................................. 30
+10.2 Layout Example .................................................... 30
+11 器件和文档支持..................................................... 31
+11.1 器件支持............................................................... 31
+11.2 社区资源................................................................ 31
+11.3 商标....................................................................... 31
+11.4 静电放电警告......................................................... 31
+11.5 Glossary................................................................ 31
+12 机械､封装和可订购信息....................................... 31
+4 修订历史记录
+Changes from Original (June 2011) to Revision A
+Page
+已添加处理额定值表，特性描述部分，器件功能模式，应用和实施部分，电源相关建议部分，布局部分，器件和文档 支持部分以及机械､封装和可订购信息部分..........................................................................................................................
+Copyright © 2011–2015, Texas Instruments Incorporated
+5 Pin Configuration and Functions
+DGS Package 10-Pin VSSOP
+Top View
+IN+
+A1
+10
+9
+A0
+IN–
+VBUS
+Alert
+8
+SDA
+GND
+7
+4
+VS
+SCL
+5
+Pin Functions
+PIN
+NAME NO. I/O DESCRIPTION
+A0 2 Digital input Address pin. Connect to GND, SCL, SDA, or VS. 表 2 shows pin settings and corresponding addresses.
+A1 1 Digital input Address pin. Connect to GND, SCL, SDA, or VS. 表 2 shows pin settings and corresponding addresses.
+Alert 3 Digital output Multi-functional alert, open-drain output.
+GND 7 Analog Ground.
+IN+ 10 Analog input Connect to supply side of shunt resistor.
+IN– 9 Analog input Connect to load side of shunt resistor.
+SCL 5 Digital input Serial bus clock line, open-drain input.
+SDA 4 Digital I/O Serial bus data line, open-drain input/output.
+VBUS 8 Analog input Bus voltage input.
+VS 6 Analog Power supply, 2.7 V to 5.5 V.
+6 Specifications
+6.1 Absolute Maximum Ratings
+over operating free-air temperature range (unless otherwise noted) (1)
+表格
+MIN	MAX	UNIT
+V VS	Supply voltage		6	V
+Analog Inputs, IN+, IN–	Differential (V IN+ – V IN- ) (2)	–40	40	V
+Common-Mode (V IN+ + V IN- ) / 2	–0.3	40
+V VBUS		–0.3	40	V
+V SDA		GND – 0.3	6	V
+V SCL		GND – 0.3	V VS + 0.3	V
+I IN	Input current into any pin		5	mA
+I OUT	Open-drain digital output current		10	mA
+T J	Junction temperature		150	°C
+T stg	Storage temperature range	–65	150	°C
+Stresses beyond those listed under Absolute Maximum Ratings may cause permanent damage. These are stress ratings only, which do not imply functional operation of the device at these or any other conditions beyond those indicated under Recommended Operating Conditions. Exposure to absolute-maximum-rated conditions for extended periods may affect device reliability.
+(2) IN+ and IN– may have a differential voltage between –40 V and 40 V. However, the voltage at these pins must not exceed the range –0.3 V to 40 V.
+6.2 ESD Ratings
+表格
+VALUE	UNIT
+V (ESD)	Electrostatic discharge	Human body model (HBM), per ANSI/ESDA/JEDEC JS-001, all pins (1)	±2500	V
+Charged device model (CDM), per JEDEC specification JESD22-C101, all pins (2)	±1000
+Machine model (MM)	±150
+(1) JEDEC document JEP155 states that 500-V HBM allows safe manufacturing with a standard ESD control process.
+(2) JEDEC document JEP157 states that 250-V CDM allows safe manufacturing with a standard ESD control process.
+6.3 Recommended Operating Conditions
+over operating free-air temperature range (unless otherwise noted)
+表格
+MIN	NOM	MAX	UNIT
+V CM	Common-mode input voltage		12		V
+V VS	Operating supply voltage		3.3		V
+T A	Operating free-air temperature	–40		125	°C
+6.4 Thermal Information
+表格
+THERMAL METRIC (1)	DGS (VSSOP) 10 PINS INA226	UNIT
+R θ JA	Junction-to-ambient thermal resistance	171.4	°C/W
+R θ JC(top)	Junction-to-case (top) thermal resistance	42.9	°C/W
+R θ JB	Junction-to-board thermal resistance	91.8	°C/W
+ψ JT	Junction-to-top characterization parameter	1.5	°C/W
+ψ JB	Junction-to-board characterization parameter	90.2	°C/W
+R θ JC(bot)	Junction-to-case (bottom)	n/a	°C/W
+(1) For more information about traditional and new thermal metrics, see the Semiconductor and IC Package Thermal Metrics application report, SPRA953.
+6.5 Electrical Characteristics
+T
+A
+​
+ =25
+∘
+ C
+ ,
+V
+VS
+​
+ =3.3 V
+
+V
+IN+
+​
+ =12 V
+
+V
+SENSE
+​
+ =(V
+IN+
+​
+ −V
+IN−
+​
+ )=0mV
+ and
+V
+VBUS
+​
+ =12 V
+ , unless otherwise noted
+While the input range is 36 V, the full-scale range of the ADC scaling is 40.96 V. See the Basic ADC Functions section.
+Do not apply more than 36 V.
+(2) RTI = Referred-to-input.
+(3) Input leakage is positive (current flowing into the pin) for the conditions shown at the top of this table. Negative leakage currents can occur under different input conditions.
+(4) SMBus timeout in the INA226 resets the interface any time SCL is low for more than 28 ms.
+PARAMETER TEST CONDITIONS MIN TYP MAX UNIT
+INPUT
+Shunt voltage input range –81.9175 81.92 mV
+Bus voltage input range(1) 0 36 V
+CMRR Common-mode rejection 0 V ≤VIN+ ≤36 V 126 140 dB
+VOS Shunt offset voltage, RTI(2) ±2.5 ±10 μV
+Shunt offset voltage, RTI(2) vs temperature –40°C ≤TA ≤125°C 0.02 0.1 μV/°C
+PSRR Shunt offset voltage, RTI(2) vs Power supply 2.7 V ≤VS ≤5.5 V 2.5 μV/V
+VOS Bus offset voltage, RTI(2) ±1.25 ±7.5 mV
+Bus offset voltage, RTI(2) vs temperature –40°C ≤TA ≤125°C 10 40 μV/°C
+PSRR Bus offset voltage, RTI(2) vs power supply 0.5 mV/V
+IB Input bias current (IIN+, IIN– pins) 10 μA
+VBUS input impedance 830 kΩ
+Input leakage (3) (IN+ pin) + (IN– pin), Power-down mode 0.1 0.5 μA
+DC ACCURACY
+ADC native resolution 16 Bits
+1 LSB step size Shunt voltage 2.5 μV
+Bus voltage 1.25 mV
+Shunt voltage gain error 0.02% 0.1%
+Shunt voltage gain error vs temperature –40°C ≤TA ≤125°C 10 50 ppm/°C
+Bus voltage gain error 0.02% 0.1%
+temperature Bus voltage gain error vs –40°C ≤TA ≤125°C 10 50 ppm/°C
+Differential nonlinearity ±0.1 LSB
+CT bit = 000 140 154
+CT bit = 001 204 224
+CT bit = 010 332 365 μs
+tCT ADC conversion time CT bit = 011 588 646
+CT bit = 100 1.1 1.21
+CT bit = 101 2.116 2.328
+CT bit = 110 4.156 4.572 ms
+CT bit = 111 8.244 9.068
+SMBus timeout(4) 28 35 ms
+表格
+PARAMETER	TEST CONDITIONS	MIN	TYP	MAX	UNIT
+DIGITAL INPUT/OUTPUT
+Input capacitance			3		pF
+Leakage input current	0 V ≤ V SCL ≤ V VS , 0 V ≤ V SDA ≤ V VS , 0 V ≤ V Alert ≤ V VS , 0 V ≤ V A0 ≤ V VS , 0 V ≤ V A1 ≤ V VS		0.1	1	μ A
+V IH	High-level input voltage		0.7×V VS		6	V
+V IL	Low-level input voltage		–0.5		0.3×V VS	V
+V OL	Low-level output voltage, SDA, Alert	I OL = 3 mA	0		0.4	V
+Hysteresis			500		mV
+POWER SUPPLY
+Operating supply range		2.7		5.5	V
+I Q	Quiescent current			330	420	μ A
+Quiescent current, power-down (shutdown) mode			0.5	2	μ A
+V POR	Power-on reset threshold			2		V
+6.6 Typical Characteristics
+At
+T
+A
+​
+ =25
+∘
+ C
+ .
+V
+VS
+​
+ =3.3 V
+
+V
+IN+
+​
+ =12 V
+
+V
+SENSE
+​
+ =(V
+IN+
+​
+ −V
+IN−
+​
+ )=0mV
+ and
+V
+VBUS
+​
+ =12 V
+ , unless otherwise noted.
+图 1. Frequency Response
+图 2. Shunt Input Offset Voltage Production Distribution
+图 3. Shunt Input Offset Voltage vs Temperature
+图 4. Shunt Input Common-Mode Rejection Ratio vs Temperature
+图 5. Shunt Input Gain Error Production Distribution
+图 6. Shunt Input Gain Error vs Temperature
+图 7. Shunt Input Gain Error vs Common-Mode Voltage
+图 8. Bus Input Offset Voltage Production Distribution
+图 9. Bus Input Offset Voltage vs Temperature
+图 10. Bus Input Gain Error Production Distribution
+图 11. Bus Input Gain Error vs Temperature
+图 12. Input Bias Current vs Common-Mode Voltage
+图 13. Input Bias Current vs Temperature
+图 14. Input Bias Current – Shutdown
+图 15. Active I lo vs Temperature
+图 16. Shutdown I lo vs Temperature
+图 17 Active I0 vs I²C Clock Frequency
+图 18 Shutdown I0 vs I²C Clock Frequency
+7 Detailed Description
+7.1 Overview
+The INA226 is a digital current sense amplifier with an I2C- and SMBus-compatible interface. It provides digital current, voltage, and power readings necessary for accurate decision-making in precisely-controlled systems. Programmable registers allow flexible configuration for measurement resolution as well as continuous-versustriggered operation. Detailed register information appears at the end of this data sheet, beginning with 表 4.
+7.2 Functional Block Diagram
+7.3 Feature Description
+7.3.1 Basic ADC Functions
+The INA226 device performs two measurements on the power-supply bus of interest. The voltage developed from the load current that flows through a shunt resistor creates a shunt voltage that is measured at the IN+ and IN– pins. The device can also measure the power supply bus voltage by connecting this voltage to the VBUS pin. The differential shunt voltage is measured with respect to IN– pin while the bus voltage is measured with respect to ground.
+The device is typically powered by a separate supply that can range from 2.7 V to 5.5 V. The bus that is being monitored can range in voltage from 0 V to 36 V. Based on the fixed 1.25-mV LSB for the Bus Voltage Register that a full-scale register results in a 40.96 V value.
+注
+Do not apply more than 36 V of actual voltage to the input pins.
+There are no special considerations for power-supply sequencing because the common-mode input range and power-supply voltage are independent of each other; therefore, the bus voltage can be present with the supply voltage off, and vice-versa.
+The device takes two measurements, shunt voltage and bus voltage. It then converts these measurements to current, based on the Calibration Register value, and then calculates power. Refer to the Programming the Calibration Register section.
+Current
+L
+​
+ SB=
+2
+15
+
+MaximumExpectedCurrent
+​
+ (2)
+CAL=
+Current
+L
+​
+ SB⋅R
+SHUNT
+​
+
+0.00512
+​
+
+Current=
+2048
+ShuntVoltage⋅CalibrationRegister
+​
+
+Power=
+20,000
+Current⋅BusVoltage
+​
+
+7.4 Device Functional Modes
+7.4.1 Averaging and Conversion Time
+7.4.2 Filtering and Input Considerations
+7.5 Programming
+7.5.1 Serial Bus Address
+表 2. Address Pins and Slave Addresses
+表格
+A1	A0	SLAVE ADDRESS
+GND	GND	1000000
+GND	VS	1000001
+GND	SDA	1000010
+GND	SCL	1000011
+VS	GND	1000100
+VS	VS	1000101
+VS	SDA	1000110
+VS	SCL	1000111
+SDA	GND	1001000
+SDA	VS	1001001
+SDA	SDA	1001010
+SDA	SCL	1001011
+SCL	GND	1001100
+SCL	VS	1001101
+SCL	SDA	1001110
+SCL	SCL	1001111
+7.5.5.3 High-Speed I2C Mode
+表 3. Bus Timing Diagram Definitions
+| PARAMETER | FAST MODE | HIGH-SPEED MODE | UNIT |
+| --- | --- | --- |
+| SCL operating frequency | 1kHz ~ 400kHz | 1kHz ~ 2.94MHz | MHz |
+7.6 Register Maps
+表 4. Register Set Summary
+表格
+地址	寄存器名称	复位值	读写
+00h	Configuration Register	4127h	R/W
+01h	Shunt Voltage Register	0000h	R
+02h	Bus Voltage Register	0000h	R
+03h	Power Register	0000h	R
+04h	Current Register	0000h	R
+05h	Calibration Register	0000h	R/W
+06h	Mask/Enable Register	0000h	R/W
+07h	Alert Limit Register	0000h	R/W
+FEh	Manufacturer ID	5449h	R
+FFh	Die ID	2260h	R
+表 5 Configuration Register 位定义
+表 6 AVG Bit 平均次数
+表 7 VBUSCT 转换时间
+表 8 VSHCT 转换时间
+表 9 Mode 工作模式
+8 Application and Implementation
+8.1 Application Information
+8.2 Typical Applications
+图 27 Typical Circuit
+9 Power Supply Recommendations
+10 Layout
+10.1 Layout Guidelines
+10.2 Layout Example
+11 器件和文档支持
+11.1 器件支持
+11.2 社区资源
+11.3 商标
+11.4 静电放电警告
+11.5 Glossary
+12 机械､封装和可订购信息
+订购型号：INA226AIDGSR / INA226AIDGST
+封装：VSSOP-10
+工作温度：-40℃ ~ 125℃
+版权 © 2011–2015, Texas Instruments Incorporated
