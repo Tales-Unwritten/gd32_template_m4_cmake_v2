@@ -125,6 +125,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/io_ctrl.cpp           # GPIO 引脚管理
     interface/src/usart_async_port.cpp  # 异步串口驱动（含 ISR，零堆分配）
     interface/src/spi_port.cpp          # SPI 主机驱动（阻塞全双工）
+    interface/src/timer_port.cpp        # 定时器驱动（基本定时 + PWM）
     interface/src/device_i2c_bus.cpp    # I2C 总线
     interface/src/device_i2c_dev.cpp    # I2C 设备基类
 

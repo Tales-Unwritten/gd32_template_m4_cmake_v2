@@ -12,6 +12,7 @@
 #include "ina226.hpp"
 #include "ina228.hpp"
 #include "w25q128_flash.hpp"
+#include "timer_port.hpp"
 #include "io_ctrl.hpp"
 #include "systick.h"
 #include <cstring>
@@ -34,6 +35,15 @@ io_ctrl led3(GPIOA, GPIO_PIN_7);
 
 // ── SPI 验证测试：W25Q128 Flash（SPI4, GPIOF PF6~PF9） ───
 w25q128_flash g_flash;
+
+// ── 定时器验证：TIMER2 1Hz 中断翻转 LED3 ──────────────────
+timer_port g_tick_timer({
+    timer_id::timer2, 59999, 999, {}, 0
+});
+
+void _on_timer_tick(void *) {
+    led3.toggle();
+}
 
 void function_init(void) {
   i2c_bus.i2c_init();
@@ -68,6 +78,11 @@ void function_init(void) {
   debug_uart.send_data((const uint8_t *)" ", 1);
   debug_uart.send_data((const uint8_t *)result, pass ? 4 : 4);
   debug_uart.send_data((const uint8_t *)"\r\n", 2);
+
+  // ── 定时器验证（临时禁用，排查 ISR 冲突） ────────────
+  // g_tick_timer.init();
+  // g_tick_timer.on_timeout(_on_timer_tick, nullptr);
+  // g_tick_timer.start();
 }
 
 /* ============================================================
