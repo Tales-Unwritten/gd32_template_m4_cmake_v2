@@ -132,6 +132,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/i2c_hw_port.cpp       # 硬件 I2C 驱动（阻塞读写）
     interface/src/adc_port.cpp          # ADC 驱动（阻塞单通道 + 扫描）
     interface/src/dac_port.cpp          # DAC 驱动（双通道电压输出）
+    interface/src/dma_port.cpp          # DMA 通道驱动（M2M + 外设）
     interface/src/device_i2c_bus.cpp    # I2C 总线
     interface/src/device_i2c_dev.cpp    # I2C 设备基类
 

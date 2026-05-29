@@ -16,6 +16,7 @@
 #include "i2c_hw_port.hpp"
 #include "adc_port.hpp"
 #include "dac_port.hpp"
+#include "dma_port.hpp"
 #include "io_ctrl.hpp"
 #include "systick.h"
 #include <cstring>
@@ -176,6 +177,35 @@ void function_init(void) {
       debug_uart.send_data((const uint8_t *)"\r\n[DAC] PA5 set to 1650mV\r\n", 29);
 
       // 不 deinit，保持输出电压
+  }
+
+  // ── DMA M2M 测试（DMA0 CH0, 复制 64 字节） ───
+  {
+      uint8_t src[64], dst[64];
+      for (int i = 0; i < 64; i++) src[i] = (uint8_t)(i + 0xA0);
+
+      dma_channel dma({dma_id::dma1, 0, DMA_PRIORITY_MEDIUM});
+      dma.init();
+      dma.set_width(DMA_MEMORY_WIDTH_8BIT);
+      dma.set_direction(DMA_MEMORY_TO_MEMORY);
+      dma.set_increment(true, true);
+      dma.start(src, dst, 64);
+      uint32_t tout = 0xFFFF;
+      while (!dma.done() && --tout);
+
+      int errors = (tout == 0) ? -1 : 0;
+      for (int i = 0; i < 64; i++) if (dst[i] != src[i]) errors++;
+
+      debug_uart.send_data((const uint8_t *)"\r\n[DMA] M2M 64B: ", 17);
+      if (errors == 0) {
+          debug_uart.send_data((const uint8_t *)"PASS\r\n", 6);
+      } else if (errors < 0) {
+          debug_uart.send_data((const uint8_t *)"TIMEOUT\r\n", 9);
+      } else {
+          debug_uart.send_data((const uint8_t *)"FAIL\r\n", 6);
+      }
+
+      dma.deinit();
   }
 
   i2c_bus.i2c_init();
