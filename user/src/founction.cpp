@@ -15,6 +15,7 @@
 #include "timer_port.hpp"
 #include "i2c_hw_port.hpp"
 #include "adc_port.hpp"
+#include "dac_port.hpp"
 #include "io_ctrl.hpp"
 #include "systick.h"
 #include <cstring>
@@ -85,6 +86,7 @@ void function_init(void) {
   }
 
   // ── ADC 测试（ADC0, PA0=CH0, PB3=CH3, 12-bit, 3.3V Vref） ───
+  // PB3(JTDO) 可能需要关闭 JTAG 才能读取正确值
   {
       adc_port adc({
           adc_id::adc0, ADC_RESOLUTION_12B, ADC_DATAALIGN_RIGHT,
@@ -127,6 +129,20 @@ void function_init(void) {
       debug_uart.send_data((const uint8_t *)"\r\n", 2);
 
       adc.deinit();
+  }
+
+  // ── DAC 测试（PA5=CH1, 输出 1650mV ≈ VCC/2） ───
+  {
+      dac_port dac({
+          dac_id::dac0, 0, 0, GPIOA, GPIO_PIN_5,
+          EXTERNAL_TRIGGER_DISABLE, 3300
+      });
+      dac.init();
+      dac.set_mv(1, 1650);  // PA5 输出 1.65V
+
+      debug_uart.send_data((const uint8_t *)"\r\n[DAC] PA5 set to 1650mV\r\n", 29);
+
+      // 不 deinit，保持输出电压
   }
 
   i2c_bus.i2c_init();
