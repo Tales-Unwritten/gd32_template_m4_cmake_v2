@@ -110,6 +110,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     ${LIB_DIR}/Source/gd32f4xx_syscfg.c
     ${LIB_DIR}/Source/gd32f4xx_spi.c
     ${LIB_DIR}/Source/gd32f4xx_can.c
+    ${LIB_DIR}/Source/gd32f4xx_i2c.c
 
     # ── 内核 / 调度 ─────────────────────────────────
     code/src/main.c
@@ -128,6 +129,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/spi_port.cpp          # SPI 主机驱动（阻塞全双工）
     interface/src/timer_port.cpp        # 定时器驱动（基本定时 + PWM）
     interface/src/can_port.cpp          # CAN 总线驱动（阻塞收发）
+    interface/src/i2c_hw_port.cpp       # 硬件 I2C 驱动（阻塞读写）
     interface/src/device_i2c_bus.cpp    # I2C 总线
     interface/src/device_i2c_dev.cpp    # I2C 设备基类
 
