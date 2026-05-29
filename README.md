@@ -1,6 +1,43 @@
 # GD32F470 嵌入式开发模板
 
-基于 **GD32F470ZIT6** 的固件模板项目，使用 CMake + arm-none-eabi-gcc 构建系统，支持 **Modbus RTU** 和 **ASCII 字符串指令** 双协议栈。
+基于 **GD32F470/GD32F450** 的工业级固件模板项目，CMake + arm-none-eabi-gcc 构建，
+支持 **Modbus RTU** 和 **ASCII 字符串指令** 双协议栈。
+
+> 开发板：MickeyPlus V2.0.0 (GD32F450ZGT6, 144-pin LQFP)
+> 引脚表：[PINOUT.md](PINOUT.md) | 开发规范：[.agents/skills/gd32-peripheral-wrapper/SKILL.md](.agents/skills/gd32-peripheral-wrapper/SKILL.md)
+
+---
+
+## 快速开始
+
+```bash
+cmake --preset debug            # 配置
+cmake --build build/debug -j16  # 编译
+# 烧录 DAP-Link
+openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg \
+        -c "program build/debug/gd32f470_template.elf verify reset exit"
+```
+
+编译产物：`build/debug/gd32f470_template.elf` / `.hex` / `.bin` / `.map`
+
+当前：**FLASH 22.1KB / 2MB (1.1%), RAM 6.0KB / 704KB (0.8%)**
+
+---
+
+## C++ Interface 封装层（8 个外设类）
+
+| 类 | 文件 | 功能 | 验证 |
+|----|------|------|------|
+| `io_ctrl` | `interface/io_ctrl` | GPIO 单引脚原子操作 | 基类 |
+| `usart_async_port<RX,TX>` | `interface/usart_async_port` | 异步串口（零堆分配） | 11/11 协议测试 |
+| `spi_port` | `interface/spi_port` | SPI 主机全双工 | W25Q128 ID 0xEF7018 |
+| `timer_port` | `interface/timer_port` | 基本定时 + PWM + 中断 | LED 1Hz 闪烁 |
+| `device_i2c_bus` | `interface/device_i2c_bus` | 软 I2C 总线 | INA228 读写 |
+| `can_port` | `interface/can_port` | CAN 总线收发 | 编译通过 |
+| `i2c_hw_port` | `interface/i2c_hw_port` | 硬件 I2C 主机 | 总线扫描 0x50 |
+| `adc_port` | `interface/adc_port` | ADC 单通道+扫描 | PA0=3291mV |
+| `dac_port` | `interface/dac_port` | DAC 双通道输出 | 1637mV↔1650mV |
+| `dma_channel` | `interface/dma_port` | DMA M2M/P2M/M2P | 64B M2M PASS |
 
 ---
 
