@@ -49,6 +49,8 @@ void spi_port::_enable_clock()
         case spi_id::spi0: rcu_periph_clock_enable(RCU_SPI0); break;
         case spi_id::spi1: rcu_periph_clock_enable(RCU_SPI1); break;
         case spi_id::spi2: rcu_periph_clock_enable(RCU_SPI2); break;
+        case spi_id::spi3: rcu_periph_clock_enable(RCU_SPI3); break;
+        case spi_id::spi4: rcu_periph_clock_enable(RCU_SPI4); break;
     }
 }
 
@@ -66,6 +68,8 @@ void spi_port::init()
         case spi_id::spi0: _periph = SPI0; break;
         case spi_id::spi1: _periph = SPI1; break;
         case spi_id::spi2: _periph = SPI2; break;
+        case spi_id::spi3: _periph = SPI3; break;
+        case spi_id::spi4: _periph = SPI4; break;
     }
 
     // 时钟

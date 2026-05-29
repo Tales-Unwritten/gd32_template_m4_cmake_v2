@@ -11,6 +11,7 @@
 #include "i2c_test_simple.hpp"
 #include "ina226.hpp"
 #include "ina228.hpp"
+#include "w25q128_flash.hpp"
 #include "io_ctrl.hpp"
 #include "systick.h"
 #include <cstring>
@@ -31,6 +32,9 @@ io_ctrl led1(GPIOC, GPIO_PIN_4);
 io_ctrl led2(GPIOC, GPIO_PIN_5);
 io_ctrl led3(GPIOA, GPIO_PIN_7);
 
+// ── SPI 验证测试：W25Q128 Flash（SPI4, GPIOF PF6~PF9） ───
+w25q128_flash g_flash;
+
 void function_init(void) {
   i2c_bus.i2c_init();
   // i2c_bus1.i2c_init();
@@ -49,6 +53,21 @@ void function_init(void) {
   // RS232Port_Init();   // 初始化 RS232 串口（需要时取消注释）
 
   Protocol_Init();       // 初始化当前活跃协议（Modbus / 字符串指令）
+
+  // ── SPI 验证：读取 W25Q128 Flash JEDEC ID ────────────
+  g_flash.init();
+  uint32_t flash_id = g_flash.read_jedec_id();
+  bool pass = (flash_id == 0xEF7018);
+  const char *result = pass ? "PASS" : "FAIL";
+  debug_uart.send_data((const uint8_t *)"\r\n[SPI_TEST] JEDEC ID: ", 22);
+  for (int8_t n = 5; n >= 0; n--) {
+      uint8_t hex = (flash_id >> (n * 4)) & 0x0F;
+      uint8_t ch = hex < 10 ? '0' + hex : 'A' + (hex - 10);
+      debug_uart.send_data(&ch, 1);
+  }
+  debug_uart.send_data((const uint8_t *)" ", 1);
+  debug_uart.send_data((const uint8_t *)result, pass ? 4 : 4);
+  debug_uart.send_data((const uint8_t *)"\r\n", 2);
 }
 
 /* ============================================================

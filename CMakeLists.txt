@@ -108,6 +108,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     ${LIB_DIR}/Source/gd32f4xx_dma.c
     ${LIB_DIR}/Source/gd32f4xx_exti.c
     ${LIB_DIR}/Source/gd32f4xx_syscfg.c
+    ${LIB_DIR}/Source/gd32f4xx_spi.c
 
     # ── 内核 / 调度 ─────────────────────────────────
     code/src/main.c
@@ -133,6 +134,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     bsp/src/debug_port.cpp              # Debug 串口 (USART0)
     bsp/src/rs485_port.cpp              # RS485 串口 (USART1, DE=PG13)
     bsp/src/rs232_port.cpp              # RS232 串口 (USART2)
+    bsp/src/w25q128_flash.cpp           # W25Q128 Flash (SPI4)
 
     # ── Modbus 协议栈 ───────────────────────────────
     middleware/modbus/src/modbus_crc.cpp         # CRC 校验

@@ -19,7 +19,7 @@
 
 /** @brief SPI 外设 ID */
 enum class spi_id : uint8_t {
-    spi0, spi1, spi2
+    spi0, spi1, spi2, spi3, spi4
 };
 
 // ============================================================
@@ -29,12 +29,12 @@ enum class spi_id : uint8_t {
 /**
  * @brief SPI 主机端口配置
  *
- * SPI 时钟极性和相位在 GD32 中是组合宏，使用 clock_polarity_phase 统一配置。
- * 常用值：
- *   - SPI_CK_PL_LOW_PH_1EDGE   (CPOL=0, CPHA=0, Mode 0)
- *   - SPI_CK_PL_LOW_PH_2EDGE   (CPOL=0, CPHA=1, Mode 1)
- *   - SPI_CK_PL_HIGH_PH_1EDGE  (CPOL=1, CPHA=0, Mode 2)
- *   - SPI_CK_PL_HIGH_PH_2EDGE  (CPOL=1, CPHA=1, Mode 3)
+ * 各字段使用 GD32 标准外设库宏：
+ *   prescaler:      SPI_PSC_2 ~ SPI_PSC_256
+ *   clock_polarity_phase: SPI_CK_PL_LOW_PH_1EDGE ~ SPI_CK_PL_HIGH_PH_2EDGE
+ *   frame_format:   SPI_ENDIAN_MSB / SPI_ENDIAN_LSB
+ *   frame_size:     SPI_FRAMESIZE_8BIT / SPI_FRAMESIZE_16BIT
+ *   cs_active_level: RESET（低有效）或 SET（高有效）
  */
 struct SpiPortConfig {
     spi_id   periph;              ///< 外设 ID
