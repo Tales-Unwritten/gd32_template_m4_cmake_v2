@@ -1,41 +1,38 @@
 [
   {
-    "label": "Configure Debug",
-    "command": "cmake --preset debug",
-    "cwd": "$ZED_WORKTREE_ROOT"
-  },
-
-  {
     "label": "Build Debug",
     "command": "cmake --build --preset debug",
     "cwd": "$ZED_WORKTREE_ROOT"
   },
-
   {
     "label": "Flash DAPLink",
-    "command": "cmake --build build/debug --target flash-daplink",
+    "command": "openocd -f interface/cmsis-dap.cfg -c \"transport select swd; adapter speed 1000\" -c \"set CHIPNAME gd32f470; source [find target/stm32f4x.cfg]\" -c \"program build/debug/gd32f470_template.elf verify reset exit\"",
     "cwd": "$ZED_WORKTREE_ROOT",
     "shell": "system"
   },
-
   {
-    "label": "Flash JLink",
-    "command": "cmake --build build/debug --target flash-jlink",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "shell": "system"
+    "label": "Build + Flash",
+    "command": "sh -c 'cmake --build --preset debug && openocd -f interface/cmsis-dap.cfg -c \"transport select swd; adapter speed 1000\" -c \"set CHIPNAME gd32f470; source [find target/stm32f4x.cfg]\" -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
+    "cwd": "$ZED_WORKTREE_ROOT"
   },
-
   {
-    "label": "OpenOCD DAPLink",
-    "command": "cmake --build build/debug --target debug",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true
+    "label": "Switch Modbus + Flash",
+    "command": "sh -c 'sed -i \"s/ACTIVE_PROTOCOL  PROTOCOL_STRING_CMD/ACTIVE_PROTOCOL  PROTOCOL_MODBUS/\" App/inc/protocol.hpp; touch App/src/protocol.cpp App/src/protocol_string.cpp user/src/founction.cpp; cmake --build --preset debug && openocd -f interface/cmsis-dap.cfg -c \"transport select swd; adapter speed 1000\" -c \"set CHIPNAME gd32f470; source [find target/stm32f4x.cfg]\" -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
+    "cwd": "$ZED_WORKTREE_ROOT"
   },
-
   {
-    "label": "OpenOCD JLink",
-    "command": "cmake --build build/debug --target debug-jlink",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true
+    "label": "Switch String + Flash",
+    "command": "sh -c 'sed -i \"s/ACTIVE_PROTOCOL  PROTOCOL_MODBUS/ACTIVE_PROTOCOL  PROTOCOL_STRING_CMD/\" App/inc/protocol.hpp; touch App/src/protocol.cpp App/src/protocol_string.cpp user/src/founction.cpp; cmake --build --preset debug && openocd -f interface/cmsis-dap.cfg -c \"transport select swd; adapter speed 1000\" -c \"set CHIPNAME gd32f470; source [find target/stm32f4x.cfg]\" -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Test Modbus",
+    "command": "python3 test_modbus.py /dev/ttyACM1",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Test String",
+    "command": "python3 test_string.py /dev/ttyACM1",
+    "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]

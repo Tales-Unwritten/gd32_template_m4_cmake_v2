@@ -3,9 +3,15 @@ build/
 
 # Cache
 .cache/
+__pycache__/
 
 # CMake generated
 cmake-build-*/
+compile_commands.json
+
+# IDE config (per-user)
+.vscode/
+.clangd
 
 # Object files
 *.o

@@ -147,8 +147,6 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
 
     # ── 用户应用 ───────────────────────────────────
     user/src/founction.cpp              # 主循环 / 初始化
-    user/src/cmd_parser.cpp
-    user/src/cmd_table.cpp
 )
 
 # ============================================================

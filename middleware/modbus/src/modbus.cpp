@@ -97,7 +97,14 @@ static void Modbus_DebugEcho(void)
 {
     if (Modbus.send == NULL) return;
     static const char hex[] = "0123456789ABCDEF";
-    uint8_t buf[128];
+    /* ★ BUG-FIX: 必须声明为 static
+     *   原因: send_data_it() 是非阻塞中断发送，只保存指针，不复制数据。
+     *         若用局部数组，Modbus_DebugEcho() 返回后栈帧销毁，
+     *         TBE 中断触发时 tx_data 指向已释放的栈内存，导致发出乱码。
+     *         改为 static 后缓冲区生命周期为整个程序运行期，指针永远有效。
+     *   修改: uint8_t buf[128]  →  static uint8_t buf[128]
+     */
+    static uint8_t buf[128];
     uint16_t pos = 0;
     buf[pos++] = '[';
     for (uint16_t i = 0; i < Modbus.rx_len && pos < 120; i++) {

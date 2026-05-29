@@ -148,6 +148,9 @@ static bool parse_channel_command(const char *cmd, char *resp, size_t sz)
  *  主轮询
  * ============================================================ */
 
+/** @brief 字符串指令协议初始化（当前无需操作，保留接口供后续扩展） */
+void StringCmd_Init(void) {}
+
 void StringCmd_Task(void)
 {
     uart_buffer_t *buf = debug_uart.buffer();

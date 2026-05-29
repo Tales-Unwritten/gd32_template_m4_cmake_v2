@@ -60,9 +60,9 @@ const modbus_port_t modbus_ports[] = {
     {
         rs485_uart.buffer(),
         [](uint8_t *b, uint16_t l) {
-            rs485_de.high();
-            rs485_uart.send_data(b, l);
             rs485_de.low();
+            rs485_uart.send_data(b, l);
+            rs485_de.high();
         }
     },
 #endif
