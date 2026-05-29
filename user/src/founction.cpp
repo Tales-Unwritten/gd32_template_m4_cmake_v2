@@ -79,10 +79,10 @@ void function_init(void) {
   debug_uart.send_data((const uint8_t *)result, pass ? 4 : 4);
   debug_uart.send_data((const uint8_t *)"\r\n", 2);
 
-  // ── 定时器验证（临时禁用，排查 ISR 冲突） ────────────
-  // g_tick_timer.init();
-  // g_tick_timer.on_timeout(_on_timer_tick, nullptr);
-  // g_tick_timer.start();
+  // ── 定时器验证：1Hz 中断翻转 LED3（PA7） ──────────────
+  g_tick_timer.init();
+  g_tick_timer.on_timeout(_on_timer_tick, nullptr);
+  g_tick_timer.start();
 }
 
 /* ============================================================

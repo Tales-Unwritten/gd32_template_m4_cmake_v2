@@ -192,7 +192,8 @@ void timer_port::init()
         timer_channel_output_mode_config(_periph, (uint16_t)i, TIMER_OC_MODE_PWM0);
     }
 
-    // 使能更新中断
+    // 清除残留中断标志，再使能中断
+    timer_interrupt_flag_clear(_periph, TIMER_INT_FLAG_UP);
     timer_interrupt_enable(_periph, TIMER_INT_UP);
     nvic_irq_enable(_get_irq(), 0, 0);
 
