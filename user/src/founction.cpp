@@ -13,6 +13,7 @@
 #include "ina228.hpp"
 #include "w25q128_flash.hpp"
 #include "timer_port.hpp"
+#include "i2c_hw_port.hpp"
 #include "io_ctrl.hpp"
 #include "systick.h"
 #include <cstring>
@@ -46,6 +47,60 @@ void _on_timer_tick(void *) {
 }
 
 void function_init(void) {
+  // 先初始化调试串口（用于输出测试结果）
+  DebugPort_Init();
+
+  // ── 硬件 I2C 压力测试（I2C0, PB6/PB7, 400kHz） ───
+  // PE2/PE3 不支持硬件 I2C AF，故用 I2C0 测试。与软 I2C1 总线独立。
+  {
+      i2c_hw_port i2c0({i2c_hw_id::i2c0, GPIOB, GPIO_PIN_6,
+                         GPIOB, GPIO_PIN_7, GPIO_AF_4, 400000});
+      i2c0.init();
+
+      // 简单测试：扫描 I2C0 总线，发地址看是否有 ACK
+      // 先测一个已知存在的地址：AT24C02 @ 0x50(7-bit)
+      uint8_t found = 0;
+      for (uint8_t addr = 0x02; addr < 0x7F; addr++) {
+          i2c0.i2c_lock();
+          i2c0.i2c_start();
+          i2c0.i2c_write_byte(addr << 1);  // 写地址
+          if (i2c0.i2c_wait_ack(500)) {
+              found = addr;
+              i2c0.i2c_stop();
+              i2c0.i2c_unlock();
+              break;
+          }
+          i2c0.i2c_stop();
+          i2c0.i2c_unlock();
+      }
+
+      // 输出扫描结果
+      debug_uart.send_data((const uint8_t *)"\r\n[HW_I2C] scan=", 17);
+      for (int8_t n = 1; n >= 0; n--) {
+          uint8_t hex = (found >> (n * 4)) & 0x0F;
+          uint8_t ch = hex < 10 ? '0' + hex : 'A' + (hex - 10);
+          debug_uart.send_data(&ch, 1);
+      }
+
+      // 压力测试：读 EEPROM[0x00] 100 次
+      int errors = 0;
+      uint8_t ref_val = 0xFF;
+      i2c0.i2c_read_reg(0x50, 0x00, &ref_val, 1);  // 参考值
+      for (int i = 0; i < 100; i++) {
+          uint8_t data = 0x00;
+          i2c0.i2c_read_reg(0x50, 0x00, &data, 1);
+          if (data != ref_val) errors++;
+      }
+      debug_uart.send_data((const uint8_t *)", 100r ", 7);
+      uint8_t e1 = errors / 10 + '0';
+      uint8_t e2 = errors % 10 + '0';
+      debug_uart.send_data(&e1, 1);
+      debug_uart.send_data(&e2, 1);
+      debug_uart.send_data((const uint8_t *)"err\r\n", 5);
+
+      i2c0.deinit();
+  }
+
   i2c_bus.i2c_init();
   // i2c_bus1.i2c_init();
 
@@ -58,7 +113,7 @@ void function_init(void) {
   led2.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
   led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
 
-  DebugPort_Init();     // 初始化调试串口
+  // DebugPort_Init() 已在上方调用
   // RS485Port_Init();   // 初始化 RS485 串口（需要时取消注释）
   // RS232Port_Init();   // 初始化 RS232 串口（需要时取消注释）
 

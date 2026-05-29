@@ -33,20 +33,34 @@ struct I2cHwConfig {
 };
 
 // ============================================================
-//  硬件 I2C 主机端口
+//  硬件 I2C 总线（兼容 device_i2c_bus 接口）
 // ============================================================
 
 /**
- * @brief 硬件 I2C 主机端口（阻塞读写）
+ * @brief 硬件 I2C 总线端口
  *
- * 使用示例（I2C1 @ 400kHz）：
- *   static i2c_hw_port i2c1({
- *       i2c_hw_id::i2c1, GPIOE, GPIO_PIN_2, GPIOE, GPIO_PIN_3,
- *       GPIO_AF_4, 400000
- *   });
- *   i2c1.init();
- *   i2c1.write_reg(0x40, 0x00, tx_data, 2);   // 写设备 0x40 寄存器 0x00
- *   i2c1.read_reg(0x40, 0x3E, rx_data, 2);    // 读设备 0x40 寄存器 0x3E
+ * 提供与 device_i2c_bus 相同风格的总线级操作接口。
+ * device_i2c_dev 可以通过组合此对象来使用硬件 I2C。
+ *
+ * 总线级使用示例：
+ *   i2c_hw_port bus({i2c_hw_id::i2c0, GPIOB, GPIO_PIN_6,
+ *                     GPIOB, GPIO_PIN_7, GPIO_AF_4, 400000});
+ *   bus.init();
+ *   bus.i2c_start();
+ *   bus.i2c_write_byte(0xA0);     // 设备地址 (写)
+ *   bus.i2c_wait_ack();
+ *   bus.i2c_write_byte(0x00);     // 寄存器地址
+ *   bus.i2c_wait_ack();
+ *   bus.i2c_start();              // 重复 START
+ *   bus.i2c_write_byte(0xA1);     // 设备地址 (读)
+ *   bus.i2c_wait_ack();
+ *   uint8_t data = bus.i2c_read_byte();
+ *   bus.i2c_write_ack(1);         // NACK
+ *   bus.i2c_stop();
+ *
+ * 设备级使用示例（封装推荐）：
+ *   bus.i2c_write_reg(0x50, 0x00, tx_data, 2);
+ *   bus.i2c_read_reg(0x50, 0x00, rx_data, 2);
  */
 class i2c_hw_port {
 public:
@@ -61,44 +75,44 @@ public:
     void deinit();
     [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
 
-    // ── 主机阻塞读写（原始） ──────────────────────────────
+    // 总线控制（兼容 device_i2c_bus 接口） ──────────────
 
-    /** @brief 主机阻塞写入
-     *  @param dev_addr 7-bit 设备地址（不含 R/W bit）
-     *  @param data     数据缓冲区
-     *  @param len      字节数
-     */
-    bool write(uint8_t dev_addr, const uint8_t *data, uint16_t len);
+    void    i2c_start();        ///< 起始条件（等待总线空闲）
+    void    i2c_restart();      ///< 重复起始条件（不等待空闲，总线已占有）
+    void    i2c_stop();
+    void    i2c_write_byte(uint8_t data);
+    uint8_t i2c_read_byte();
+    bool    i2c_wait_ack(uint16_t timeout = 1000);
+    void    i2c_write_ack(uint8_t ack);    // 0=ACK, 1=NACK
 
-    /** @brief 主机阻塞读取
-     *  @param dev_addr 7-bit 设备地址（不含 R/W bit）
-     *  @param data     接收缓冲区
-     *  @param len      字节数
-     */
-    bool read(uint8_t dev_addr, uint8_t *data, uint16_t len);
+    // ── 互斥 ──────────────────────────────────────────────
+    void    i2c_lock();
+    void    i2c_unlock();
+    [[nodiscard]] uint8_t i2c_is_busy() const { return _busy; }
 
-    // ── 设备寄存器操作（兼容 I2C 设备模式） ────────────────
+    // ── 设备级便利方法（基于总线操作实现） ───────────────
 
-    /** @brief 写设备寄存器（先发 reg，再发 data） */
-    bool write_reg(uint8_t dev_addr, uint8_t reg,
-                   const uint8_t *data, uint16_t len);
+    /** @brief 写设备寄存器：START→ADDR(W)→REG→DATA...→STOP */
+    void i2c_write_reg(uint8_t dev_addr_7bit, uint8_t reg,
+                       const uint8_t *data, uint16_t len);
 
-    /** @brief 读设备寄存器（先写 reg，再读 data） */
-    bool read_reg(uint8_t dev_addr, uint8_t reg,
-                  uint8_t *data, uint16_t len);
+    /** @brief 读设备寄存器：START→ADDR(W)→REG→RESTART→ADDR(R)→DATA...→STOP */
+    void i2c_read_reg(uint8_t dev_addr_7bit, uint8_t reg,
+                      uint8_t *data, uint16_t len);
 
     // ── 查询 ──────────────────────────────────────────────
-
     [[nodiscard]] i2c_hw_id periph() const noexcept { return _cfg.periph; }
 
 private:
     void _enable_clock();
+    void _wait_flag(i2c_flag_enum flag);
 
-    I2cHwConfig _cfg;
-    io_ctrl     _scl;
-    io_ctrl     _sda;
-    bool        _initialized;
-    uint32_t    _periph;
+    I2cHwConfig    _cfg;
+    io_ctrl        _scl;
+    io_ctrl        _sda;
+    bool           _initialized;
+    uint32_t       _periph;
+    volatile uint8_t _busy;
 };
 
 #endif /* __cplusplus */

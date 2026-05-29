@@ -4,8 +4,8 @@
 //   需要替换的映射：
 //     - 外设基址:   I2C0/I2C1/I2C2 → 目标平台外设基址
 //     - 时钟使能:   rcu_periph_clock_enable(RCU_I2Cx)
-//     - 外设初始化:  i2c_clock_config / i2c_init
-//     - 数据传输:   i2c_master_transmit_by_address / i2c_master_receive_by_address
+//     - 外设初始化:  i2c_clock_config / i2c_mode_addr_config
+//     - 总线操作:   I2C_CTL0_START/STOP, I2C_DATA, I2C_STAT0 flags
 //     - GPIO 复用:  AF4 → 目标平台 AF 编号
 // ============================================================
 
@@ -25,6 +25,7 @@ i2c_hw_port::i2c_hw_port(const I2cHwConfig &cfg)
     , _sda(cfg.sda_port, cfg.sda_pin)
     , _initialized(false)
     , _periph(0)
+    , _busy(0)
 {
 }
 
@@ -55,7 +56,6 @@ void i2c_hw_port::init()
 {
     if (_initialized) return;
 
-    // 外设基址
     // [PORT] GD32 外设基址映射
     switch (_cfg.periph) {
         case i2c_hw_id::i2c0: _periph = I2C0; break;
@@ -65,20 +65,16 @@ void i2c_hw_port::init()
 
     _enable_clock();
 
-    // GPIO: 开漏输出 + 上拉，AF 模式
-    _scl.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ);
+    // GPIO: 开漏输出 + 内部上拉，AF 模式
+    _scl.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ);
     _scl.set_af(_cfg.af);
-    _sda.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ);
+    _sda.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ);
     _sda.set_af(_cfg.af);
 
-    // I2C 时钟配置
+    // I2C 时钟 + 主机模式
     i2c_clock_config(_periph, _cfg.clock_speed, I2C_DTCY_2);
-
-    // I2C 外设初始化（主机模式，7-bit 地址）
     i2c_mode_addr_config(_periph, I2C_I2CMODE_ENABLE,
                          I2C_ADDFORMAT_7BITS, 0);
-
-    // 使能 I2C + 应答
     i2c_enable(_periph);
     i2c_ack_config(_periph, I2C_ACK_ENABLE);
 
@@ -95,160 +91,158 @@ void i2c_hw_port::deinit()
 
     i2c_ack_config(_periph, I2C_ACK_DISABLE);
     i2c_disable(_periph);
+    i2c_deinit(_periph);
 
     _scl.deinit();
     _sda.deinit();
+
+    // 禁用 I2C 时钟，防止干扰后续软 I2C
+    switch (_cfg.periph) {
+        case i2c_hw_id::i2c0: rcu_periph_clock_disable(RCU_I2C0); break;
+        case i2c_hw_id::i2c1: rcu_periph_clock_disable(RCU_I2C1); break;
+        case i2c_hw_id::i2c2: rcu_periph_clock_disable(RCU_I2C2); break;
+    }
 
     _periph = 0;
     _initialized = false;
 }
 
 // ============================================================
-//  主机阻塞写入
+//  互斥
 // ============================================================
 
-bool i2c_hw_port::write(uint8_t dev_addr, const uint8_t *data, uint16_t len)
+void i2c_hw_port::i2c_lock()
 {
-    if (!_initialized || !data || len == 0) return false;
+    while (_busy);
+    _busy = 1;
+}
 
+void i2c_hw_port::i2c_unlock()
+{
+    _busy = 0;
+}
+
+// ============================================================
+//  等待指定标志
+// ============================================================
+
+void i2c_hw_port::_wait_flag(i2c_flag_enum flag)
+{
+    uint32_t timeout = 0xFFFF;
+    while (!i2c_flag_get(_periph, flag)) {
+        if (--timeout == 0) return;
+    }
+}
+
+// ============================================================
+//  总线控制（GD32 寄存器级实现）
+// ============================================================
+
+void i2c_hw_port::i2c_start()
+{
     // 等待总线空闲
     uint32_t timeout = 0xFFFF;
     while (i2c_flag_get(_periph, I2C_FLAG_I2CBSY)) {
-        if (--timeout == 0) return false;
+        if (--timeout == 0) return;
     }
-
-    // 发送起始条件
+    // 生成 START（或重复 START）
     i2c_start_on_bus(_periph);
-
-    // 等待 SBSEND（起始条件已发送）
-    timeout = 0xFFFF;
-    while (!i2c_flag_get(_periph, I2C_FLAG_SBSEND)) {
-        if (--timeout == 0) return false;
-    }
-
-    // 发送设备地址（写方向）
-    i2c_master_addressing(_periph, dev_addr, I2C_TRANSMITTER);
-
-    // 等待 ADDSEND（地址已发送）
-    timeout = 0xFFFF;
-    while (!i2c_flag_get(_periph, I2C_FLAG_ADDSEND)) {
-        if (--timeout == 0) return false;
-    }
-    i2c_flag_clear(_periph, I2C_FLAG_ADDSEND);
-
-    // 发送数据
-    for (uint16_t i = 0; i < len; i++) {
-        timeout = 0xFFFF;
-        while (!i2c_flag_get(_periph, I2C_FLAG_TBE)) {
-            if (--timeout == 0) break;
-        }
-        i2c_data_transmit(_periph, data[i]);
-    }
-
-    // 等待传输完成
-    timeout = 0xFFFF;
-    while (!i2c_flag_get(_periph, I2C_FLAG_BTC)) {
-        if (--timeout == 0) break;
-    }
-
-    // 发送停止条件
-    i2c_stop_on_bus(_periph);
-    while (i2c_flag_get(_periph, I2C_FLAG_STPDET)) {
-        // 等待停止条件检测
-    }
-    i2c_flag_clear(_periph, I2C_FLAG_STPDET);
-
-    return true;
+    _wait_flag(I2C_FLAG_SBSEND);
 }
 
-// ============================================================
-//  主机阻塞读取
-// ============================================================
-
-bool i2c_hw_port::read(uint8_t dev_addr, uint8_t *data, uint16_t len)
+void i2c_hw_port::i2c_restart()
 {
-    if (!_initialized || !data || len == 0) return false;
-
-    uint32_t timeout;
-
-    // 等待总线空闲
-    timeout = 0xFFFF;
-    while (i2c_flag_get(_periph, I2C_FLAG_I2CBSY)) {
-        if (--timeout == 0) return false;
-    }
-
-    // 发送起始条件
+    // 重复 START：总线已被本主机占有，直接发 START
     i2c_start_on_bus(_periph);
+    _wait_flag(I2C_FLAG_SBSEND);
+}
 
-    // 等待 SBSEND
-    timeout = 0xFFFF;
-    while (!i2c_flag_get(_periph, I2C_FLAG_SBSEND)) {
-        if (--timeout == 0) return false;
-    }
-
-    // 发送设备地址（读方向）
-    i2c_master_addressing(_periph, dev_addr, I2C_RECEIVER);
-
-    // 等待 ADDSEND
-    timeout = 0xFFFF;
-    while (!i2c_flag_get(_periph, I2C_FLAG_ADDSEND)) {
-        if (--timeout == 0) return false;
-    }
-    i2c_flag_clear(_periph, I2C_FLAG_ADDSEND);
-
-    // 对于单字节读取，提前禁用 ACK（在最后一个字节之前）
-    if (len == 1) {
-        i2c_ack_config(_periph, I2C_ACK_DISABLE);
-    }
-
-    // 读取数据
-    for (uint16_t i = 0; i < len; i++) {
-        // 倒数第二个字节时，准备 NACK
-        if (i == len - 2) {
-            i2c_ack_config(_periph, I2C_ACK_DISABLE);
-        }
-
-        timeout = 0xFFFF;
-        while (!i2c_flag_get(_periph, I2C_FLAG_RBNE)) {
-            if (--timeout == 0) break;
-        }
-        data[i] = i2c_data_receive(_periph);
-    }
-
-    // 发送停止条件
+void i2c_hw_port::i2c_stop()
+{
     i2c_stop_on_bus(_periph);
     while (i2c_flag_get(_periph, I2C_FLAG_STPDET)) {}
     i2c_flag_clear(_periph, I2C_FLAG_STPDET);
+}
 
-    // 恢复 ACK
-    i2c_ack_config(_periph, I2C_ACK_ENABLE);
+void i2c_hw_port::i2c_write_byte(uint8_t data)
+{
+    _wait_flag(I2C_FLAG_TBE);
+    i2c_data_transmit(_periph, data);
+}
 
+uint8_t i2c_hw_port::i2c_read_byte()
+{
+    _wait_flag(I2C_FLAG_RBNE);
+    return i2c_data_receive(_periph);
+}
+
+bool i2c_hw_port::i2c_wait_ack(uint16_t timeout)
+{
+    // 等待 ADDSEND 或超时（主设备地址发送后从机应答）
+    while (!i2c_flag_get(_periph, I2C_FLAG_ADDSEND)) {
+        if (--timeout == 0) return false;
+    }
+    i2c_flag_clear(_periph, I2C_FLAG_ADDSEND);
     return true;
 }
 
-// ============================================================
-//  设备寄存器操作
-// ============================================================
-
-bool i2c_hw_port::write_reg(uint8_t dev_addr, uint8_t reg,
-                             const uint8_t *data, uint16_t len)
+void i2c_hw_port::i2c_write_ack(uint8_t ack)
 {
-    // 构造 [reg + data] 组合缓冲区（栈上，零堆分配）
-    if (len > 32) return false;  // 栈安全限制
-
-    uint8_t buf[33];
-    buf[0] = reg;
-    for (uint16_t i = 0; i < len; i++) {
-        buf[i + 1] = data[i];
-    }
-    return write(dev_addr, buf, len + 1);
+    i2c_ack_config(_periph, ack ? I2C_ACK_DISABLE : I2C_ACK_ENABLE);
 }
 
-bool i2c_hw_port::read_reg(uint8_t dev_addr, uint8_t reg,
-                            uint8_t *data, uint16_t len)
+// ============================================================
+//  设备级操作（基于总线 API 实现，与 device_i2c_dev 一致）
+// ============================================================
+
+void i2c_hw_port::i2c_write_reg(uint8_t dev_addr_7bit, uint8_t reg,
+                                 const uint8_t *data, uint16_t len)
 {
-    // 先写寄存器地址
-    if (!write(dev_addr, &reg, 1)) return false;
-    // 再读数据
-    return read(dev_addr, data, len);
+    i2c_lock();
+
+    i2c_start();
+    i2c_write_byte(dev_addr_7bit << 1);   // 7-bit → 8-bit 写地址
+    if (!i2c_wait_ack()) goto exit;        // 地址阶段：等 ADDSEND
+    i2c_write_byte(reg);                   // 寄存器地址
+    // 数据字节后不等 ACK（ADDSEND 只在地址阶段有效）
+
+    for (uint16_t i = 0; i < len; i++) {
+        i2c_write_byte(data[i]);
+    }
+
+exit:
+    i2c_stop();
+    i2c_unlock();
+}
+
+void i2c_hw_port::i2c_read_reg(uint8_t dev_addr_7bit, uint8_t reg,
+                                uint8_t *data, uint16_t len)
+{
+    uint8_t addr_w = dev_addr_7bit << 1;
+    uint8_t addr_r = addr_w | 0x01;
+
+    i2c_lock();
+
+    // 阶段 1：写寄存器地址
+    i2c_start();
+    i2c_write_byte(addr_w);
+    if (!i2c_wait_ack()) goto exit;    // 地址阶段：等 ADDSEND
+    i2c_write_byte(reg);               // 寄存器地址（数据阶段，不等 ACK）
+
+    // 阶段 2：重复 START + 读
+    i2c_restart();
+    i2c_write_byte(addr_r);
+    if (!i2c_wait_ack()) goto exit;
+
+    // 读取数据（单字节提前 NACK）
+    if (len == 1) i2c_write_ack(1);
+    for (uint16_t i = 0; i < len; i++) {
+        if (i == len - 2) i2c_write_ack(1);
+        data[i] = i2c_read_byte();
+    }
+
+exit:
+    i2c_stop();
+    i2c_write_ack(0);  // 恢复 ACK
+    i2c_unlock();
 }
