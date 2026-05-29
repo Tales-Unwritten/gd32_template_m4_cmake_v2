@@ -42,11 +42,163 @@ App/ + user/ 层（应用逻辑）
 
 ---
 
-## 三、类设计模板
+## 三、可移植性设计规范（核心原则）
+
+### 3.0 移植边界：只有 `.cpp` 需要重写
+
+本项目的分层架构天然支持跨 MCU 移植。移植到新平台（如 STM32 / ESP32 / AT32 / MM32 / HC32 等）时：
+
+```
+                   ┌───────────────────────────┐
+  【无需修改】      │  App/  + user/  + bsp/    │  ← 纯业务逻辑
+                   ├───────────────────────────┤
+                   │  interface/inc/*.hpp      │  ← 接口契约（公共头文件）
+                   ├───────────────────────────┤
+  【仅此需重写】    │  interface/src/*.cpp      │  ← 平台适配层（.cpp 实现）
+                   ├───────────────────────────┤
+  【替换 SDK】      │  Firmware/ → STM32_HAL/   │  ← 官方 SDK
+                   └───────────────────────────┘
+```
+
+**移植工作量 = 仅重写 `interface/src/*.cpp` + 替换 `Firmware/`**，`.hpp` 头文件和所有上层代码完全不变。
+
+### 3.1 头文件（.hpp）可移植性规则
+
+公共头文件是对外暴露的**接口契约**，必须做到：
+
+```cpp
+// ============================================================
+// @platform
+//   移植到新 MCU 时，本 .hpp 文件【无需任何修改】。
+//   所有平台差异封装在对应的 .cpp 实现文件中。
+//   需要替换的内容：
+//     - 平台相关 include: 将 #include "gd32f4xx.h" 替换为目标 SDK 头文件
+//     - 类型别名:         FlagStatus, IRQn_Type 等替换或 typedef
+//     - 外设基址宏:       USART0, SPI0 等替换为目标芯片对应宏
+// ============================================================
+
+#pragma once
+
+// ── 平台相关 include（移植时替换此行） ─────────────────
+#include "gd32f4xx.h"       // [PORT] 替换为 stm32f4xx.h / esp32.h 等
+
+// ── 标准 C++（跨平台，无需修改） ───────────────────────
+#include <cstdint>
+
+#ifdef __cplusplus
+// ... 类声明，不包含任何平台特定逻辑 ...
+#endif
+```
+
+规则：
+- 所有平台相关 `#include` 集中在文件顶部，用 `[PORT]` 注释标注
+- Config 结构体字段使用 `uint32_t` / `uint16_t` 等标准类型，不依赖 GD32 宏
+- 公共方法签名不暴露 `FlagStatus`、`IRQn_Type` 等平台特定类型（如需暴露，typedef 为中性类型）
+- 头文件顶部必须包含 `@platform` Doxygen 注释，说明移植时需要替换什么
+
+### 3.2 实现文件（.cpp）平台适配规则
+
+`.cpp` 是**平台适配层**，所有 GD32 SDK 调用集中于此：
+
+```cpp
+// ============================================================
+// @platform GD32F4xx（当前平台）
+//   移植到新 MCU 时，本文件需要完整重写，但【公共接口签名不变】。
+//   需要替换的映射：
+//     - 时钟使能:   rcu_periph_clock_enable() → 目标平台时钟 API
+//     - 外设初始化:  usart_deinit/baudrate_set → 目标平台 USART API
+//     - 中断管理:   nvic_irq_enable → 目标平台 NVIC API
+//     - GPIO 复用:   gpio_af_set → 目标平台 AF 配置 API
+//     - ISR 入口:    USART0_IRQHandler → 目标平台中断向量名
+// ============================================================
+```
+
+规则：
+- 文件顶部必须包含 `@platform` 注释，列出当前平台和需要替换的 API 映射清单
+- 所有 `rcu_`, `gpio_`, `nvic_`, `usart_` 等 GD32 前缀的函数调用**只能出现在此处**
+- 平台相关的硬件操作宏（如缓存清理 `__DSB()`）用 `[PORT]` 标注
+
+### 3.3 平台差异隔离模式
+
+当同一个逻辑在不同平台实现方式不同时，使用条件编译 + 清晰注释：
+
+```cpp
+// ── 时钟使能 [PORT] ───────────────────────────────────
+// GD32: rcu_periph_clock_enable(periph_clock)
+// STM32: __HAL_RCC_USART1_CLK_ENABLE()
+
+#ifdef GD32F4xx
+    void _enable_clock() {
+        const auto p = _cfg.periph;
+        if      (p == USART0) rcu_periph_clock_enable(RCU_USART0);
+        else if (p == USART1) rcu_periph_clock_enable(RCU_USART1);
+        // ...
+    }
+#elif defined(STM32F4xx)
+    void _enable_clock() {
+        const auto p = _cfg.periph;
+        if      (p == USART1) __HAL_RCC_USART1_CLK_ENABLE();
+        else if (p == USART2) __HAL_RCC_USART2_CLK_ENABLE();
+        // ...
+    }
+#else
+    #error "Unsupported platform. Add your MCU _enable_clock() implementation."
+#endif
+```
+
+规则：
+- 平台宏命名统一：`GD32F4xx`、`STM32F4xx`、`ESP32` 等，与 CMSIS 设备宏一致
+- 每个 `#ifdef` 块用 `[PORT]` 标注
+- 最后必须有 `#else #error` 防止未定义平台静默失败
+
+### 3.4 平台相关类型隔离
+
+GD32 SDK 中有一些特定类型（`FlagStatus`、`ErrStatus` 等），在公共接口中应隔离：
+
+```cpp
+// ── 方式一：typedef 中性类型 ──────────────────────────
+// [PORT] 移植时根据目标 SDK 调整
+#ifdef GD32F4xx
+    using port_status_t = FlagStatus;     // GD32: SET/RESET
+    #define PORT_SET  SET
+    #define PORT_RESET RESET
+#elif defined(STM32F4xx)
+    using port_status_t = GPIO_PinState;  // STM32: GPIO_PIN_SET/GPIO_PIN_RESET
+    #define PORT_SET  GPIO_PIN_SET
+    #define PORT_RESET GPIO_PIN_RESET
+#endif
+
+// ── 方式二：使用标准类型（推荐） ──────────────────────
+// 公共接口直接用 bool / int / uint32_t
+[[nodiscard]] bool read();               // 返回 true/false，而非 FlagStatus
+void write(bool value);                  // 接收 true/false，而非 bit_status
+```
+
+规则：
+- **优先用标准 C++ 类型**（`bool`, `int`, `uint32_t`）暴露公共接口
+- 如果确实需要返回平台状态枚举，typedef 为 `port_status_t` 并在 Config 头文件中定义
+
+### 3.5 移植检查清单
+
+将本项目移植到新 MCU 时，按以下步骤操作：
+
+- [ ] 1. 替换 `Firmware/` 目录为新 MCU 的官方 SDK
+- [ ] 2. 修改 `interface/inc/` 中各 `.hpp` 的平台 `#include`（如 `gd32f4xx.h` → `stm32f4xx.h`）
+- [ ] 3. 重写 `interface/src/` 中各 `.cpp` 的平台 API 调用
+- [ ] 4. 更新 `io_ctrl.cpp` 中的 GPIO 操作函数映射
+- [ ] 5. 更新各 `_port.cpp` 中的 ISR 入口函数名（如 `USART0_IRQHandler` → `USART1_IRQHandler`）
+- [ ] 6. 更新 `cmake/` 工具链文件和 `CMakeLists.txt` 中的芯片宏定义
+- [ ] 7. 更新 `openocd/` 调试配置文件
+- [ ] 8. `bsp/`、`App/`、`user/` **完全不用动**
+- [ ] 9. 编译验证
+
+---
+
+## 四、类设计模板
 
 每个外设封装类必须遵循以下模式：
 
-### 3.1 文件结构
+### 4.1 文件结构
 
 ```
 interface/
@@ -58,7 +210,7 @@ interface/
 
 命名规则：`<periph>_port`，如 `usart_port`、`can_port`、`adc_port`。
 
-### 3.2 配置结构体（Config Struct）
+### 4.2 配置结构体（Config Struct）
 
 所有依赖外部输入的参数集合在一起，构造函数只接收一个 const 引用：
 
@@ -74,7 +226,7 @@ struct <Periph>PortConfig {
 - 字段命名与 GD32 库宏名保持语义一致
 - 放在类声明头文件顶部
 
-### 3.3 类声明骨架
+### 4.3 类声明骨架
 
 ```cpp
 class <periph>_port {
@@ -117,7 +269,7 @@ private:
 };
 ```
 
-### 3.4 生命周期契约
+### 4.4 生命周期契约
 
 ```
 构造函数:  只保存配置，不初始化硬件（constexpr 友好）
@@ -131,7 +283,7 @@ deinit():  注销 ISR、禁用外设、反初始化 GPIO、释放缓冲区
 析构函数:  调用 deinit()
 ```
 
-### 3.5 引脚管理
+### 4.5 引脚管理
 
 **所有引脚必须使用 `io_ctrl` 对象管理**，严禁直接调用 `gpio_mode_set()` 等函数：
 
@@ -161,7 +313,7 @@ class spi_port {
 - `lock()` — 锁定配置
 - `is_initialized()` — 状态查询
 
-### 3.6 时钟使能
+### 4.6 时钟使能
 
 封装一个 `_enable_clock()` 私有方法，内部通过 if-else 链完成外设到时钟的映射：
 
@@ -179,9 +331,9 @@ void spi_port::_enable_clock() {
 
 ---
 
-## 四、ISR 中断处理规范
+## 五、ISR 中断处理规范
 
-### 4.1 全局端口映射表
+### 5.1 全局端口映射表
 
 如果外设有多个实例且共享同一个中断向量表入口，必须使用**全局端口映射表**：
 
@@ -201,7 +353,7 @@ uint8_t _port_index(uint32_t periph) {
 }
 ```
 
-### 4.2 注册 / 注销
+### 5.2 注册 / 注销
 
 ```cpp
 void <periph>_port::_register_port() {
@@ -215,7 +367,7 @@ void <periph>_port::_unregister_port() {
 }
 ```
 
-### 4.3 ISR 处理函数
+### 5.3 ISR 处理函数
 
 **所有 ISR 入口函数必须写在对应的 `.cpp` 文件中**，不要散落在 `gd32f4xx_it.c`：
 
@@ -232,7 +384,7 @@ extern "C" void SPI0_IRQHandler(void) {
 }
 ```
 
-### 4.4 缓冲区设计
+### 5.4 缓冲区设计
 
 如果外设涉及数据收发，使用内部堆分配 + 对外暴露视图指针的模式：
 
@@ -256,7 +408,7 @@ struct <periph>_buffer_t {
 
 ---
 
-## 五、互斥与锁
+## 六、互斥与锁
 
 如果外设被多个上层对象共享（如一总线多设备），提供简单的自旋锁：
 
@@ -274,9 +426,9 @@ class bus_type {
 
 ---
 
-## 六、代码风格约束
+## 七、代码风格约束
 
-### 6.1 命名
+### 7.1 命名
 
 | 类型 | 规则 | 示例 |
 |------|------|------|
@@ -288,14 +440,14 @@ class bus_type {
 | 私有方法 | 下划线前缀 | `_enable_clock()`, `_get_irq()` |
 | 文件 | 全小写 + 下划线 | `usart_port.hpp`, `usart_port.cpp` |
 
-### 6.2 注释
+### 7.2 注释
 
 - 类/结构体上方使用 Doxygen 风格 `@brief`
 - 方法上方使用 `@brief`，参数用 `@param`
 - 返回用 `[[nodiscard]]` 标注
 - 条件编译块用 `#ifdef` 包裹平台差异代码
 
-### 6.3 安全
+### 7.3 安全
 
 - **Debug**: 使用 `assert()` 断言参数合法性
 - **Release**: 使用早期 `if (!condition) return;` 安全返回
@@ -305,7 +457,7 @@ class bus_type {
 
 ---
 
-## 七、扩展清单：待封装外设
+## 八、扩展清单：待封装外设
 
 按优先级排序，每完成一个在 `CMakeLists.txt` 中添加对应源文件：
 
@@ -324,7 +476,7 @@ class bus_type {
 
 ---
 
-## 八、新增外设封装检查清单
+## 九、新增外设封装检查清单
 
 创建新的外设封装类时，逐一确认以下项：
 
@@ -342,10 +494,12 @@ class bus_type {
 - [ ] Debug 用 `assert()`，Release 用 `if return`
 - [ ] 在 `CMakeLists.txt` 的 `target_sources` 中添加新 .cpp 文件
 - [ ] 在 `CMakeLists.txt` 的 `target_include_directories` 中确认 interface/inc 已存在
+- [ ] 可移植性：`.hpp` 顶部有 `@platform` 注释，`.cpp` 顶部有 `@platform` + API 映射清单
+- [ ] 可移植性：公共接口使用标准 C++ 类型（`bool`/`uint32_t`），平台特定类型已 typedef 隔离
 
 ---
 
-## 九、反模式（严禁）
+## 十、反模式（严禁）
 
 ### 在 bsp/ 层直接调用 GD32 SDK 函数
 
@@ -403,7 +557,7 @@ class usart_port {
 
 ---
 
-## 十、参考实现
+## 十一、参考实现
 
 以下现有文件是本规范的权威参考实现，新增封装类应尽可能与它们风格一致：
 
