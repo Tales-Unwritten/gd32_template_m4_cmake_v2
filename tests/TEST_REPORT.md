@@ -29,10 +29,10 @@
 pip install pyserial
 
 # Modbus 协议测试（4 项全功能）
-python3 test_modbus.py /dev/ttyACM1
+python3 tests/test_modbus.py /dev/ttyACM1
 
 # 字符串指令测试（11 项全覆盖）
-python3 test_string.py /dev/ttyACM1
+python3 tests/test_string.py /dev/ttyACM1
 ```
 
 > 串口号按实际设备调整，通过 `ls /dev/ttyACM*` 查看。
@@ -89,7 +89,7 @@ python3 test_string.py /dev/ttyACM1
 ### 运行方法
 
 ```bash
-python3 test_string.py /dev/ttyACM1
+python3 tests/test_string.py /dev/ttyACM1
 ```
 
 ---

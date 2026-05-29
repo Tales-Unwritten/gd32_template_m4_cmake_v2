@@ -27,12 +27,12 @@
   },
   {
     "label": "Test Modbus",
-    "command": "python3 test_modbus.py /dev/ttyACM1",
+    "command": "python3 tests/test_modbus.py /dev/ttyACM1",
     "cwd": "$ZED_WORKTREE_ROOT"
   },
   {
     "label": "Test String",
-    "command": "python3 test_string.py /dev/ttyACM1",
+    "command": "python3 tests/test_string.py /dev/ttyACM1",
     "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]
