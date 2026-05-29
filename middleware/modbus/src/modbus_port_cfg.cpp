@@ -34,7 +34,7 @@
 #endif
 
 #include "modbus.hpp"
-#include "usart_port.hpp"
+#include "usart_async_port.hpp"
 
 /* ── 多端口注册表 ──────────────────────────────────────── */
 /*

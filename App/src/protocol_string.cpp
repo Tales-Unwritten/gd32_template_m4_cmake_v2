@@ -11,7 +11,7 @@
 
 #include "protocol.hpp"
 #include "debug_port.hpp"
-#include "usart_port.hpp"
+#include "usart_async_port.hpp"
 #include "ina228.hpp"
 
 #include <cstring>

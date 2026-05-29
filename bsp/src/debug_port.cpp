@@ -1,11 +1,15 @@
 #include "debug_port.hpp"
 
-/* ── 串口实例定义 ──────────────────────────────────────── */
-
-usart_port debug_uart({ USART0, GPIOA, GPIO_PIN_9, GPIOA, GPIO_PIN_10,
-                        GPIO_AF_7, 115200, 256 });
-
-/* ── 初始化 ────────────────────────────────────────────── */
+// USART0, PA9(TX), PA10(RX), AF7, 115200, 256B RX
+usart_async_port<256> debug_uart(
+    UsartAsyncConfig{
+        usart_id::usart0,
+        GPIOA, GPIO_PIN_9,
+        GPIOA, GPIO_PIN_10,
+        GPIO_AF_7,
+        115200
+    }
+);
 
 void DebugPort_Init(void)
 {

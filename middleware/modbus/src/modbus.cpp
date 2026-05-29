@@ -13,7 +13,7 @@
  */
 
 #include "modbus.hpp"
-#include "usart_port.hpp"   // uart_buffer_t 完整定义（Modbus_FillData 访问成员需要）
+#include "usart_async_port.hpp"   // uart_buffer_t 完整定义
 
 #include <cstring>           // memcpy, memset
 

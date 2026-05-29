@@ -22,7 +22,7 @@
 /* 发送函数指针类型 */
 typedef void (*modbus_send_fn)(uint8_t *buf, uint16_t len);
 
-/* 前向声明 —— 完整定义在 usart_port.hpp 中，避免头文件耦合 */
+/* 前向声明 —— 完整定义在 usart_async_port.hpp 中，避免头文件耦合 */
 struct uart_buffer_t;
 
 typedef struct

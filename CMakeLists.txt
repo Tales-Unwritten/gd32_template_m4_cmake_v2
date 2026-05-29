@@ -122,7 +122,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
 
     # ── 接口抽象层（C++ 核心驱动） ───────────────────
     interface/src/io_ctrl.cpp           # GPIO 引脚管理
-    interface/src/usart_port.cpp        # 串口通用驱动（含 ISR）
+    interface/src/usart_async_port.cpp  # 异步串口驱动（含 ISR，零堆分配）
     interface/src/device_i2c_bus.cpp    # I2C 总线
     interface/src/device_i2c_dev.cpp    # I2C 设备基类
 

@@ -51,10 +51,10 @@ extern "C" {
 }
 
 // === C++ 专用驱动层 ===
-#include "usart_port.hpp"
+#include "usart_async_port.hpp"
 
-extern usart_port debug_uart;
-extern usart_port rs485_uart;
-extern usart_port rs232_uart;
+extern usart_async_port<256> debug_uart;
+extern usart_async_port<256> rs485_uart;
+extern usart_async_port<256> rs232_uart;
 
 #endif
