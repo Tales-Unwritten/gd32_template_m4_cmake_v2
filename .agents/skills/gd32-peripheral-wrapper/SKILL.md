@@ -107,6 +107,47 @@ spi_device        ← 设备驱动（bsp/）
 w25q128           ← 具体芯片驱动（bsp/）
 ```
 
+### 2.5 io_ctrl 为唯一 GPIO 抽象
+
+**所有 GPIO 引脚操作，必须且只能通过 `io_ctrl` 对象完成。**
+
+这是本架构最底层、最核心的约束，原因：
+
+- `io_ctrl` 封装了寄存器级原子操作（BOP/BC/TG），消除读写竞争
+- `io_ctrl` 管理时钟使能、模式锁定，上层类无需关心 GPIO 细节
+- 换芯片时只改 `io_ctrl.cpp` 中的 GPIO 寄存器映射，所有上层外设类自动适配
+
+依赖链：
+
+```
+io_ctrl  ← 唯一的 GPIO 原子操作类
+    ↑
+    │  （所有 interface 外设类通过组合 io_ctrl 管理引脚）
+    │
+usart_port._tx / ._rx        （串口 TX/RX 引脚）
+spi_port._sck / ._mosi / ._miso / ._cs   （SPI 四线引脚）
+can_port._tx / ._rx            （CAN 收发引脚）
+i2c_hw_port._scl / ._sda       （硬件 I2C 引脚）
+device_i2c_bus._scl / ._sda    （软 I2C 引脚）
+adc_port._ain                  （模拟输入引脚）
+```
+
+**铁律**：
+
+```cpp
+// ❌ 绝对禁止：在任何地方直接调用 gpio_* 函数
+gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_9);
+gpio_bit_set(GPIOA, GPIO_PIN_5);
+GPIO_BOP(GPIOA) = GPIO_PIN_5;
+
+// ✅ 唯一正确方式：通过 io_ctrl
+io_ctrl tx(GPIOA, GPIO_PIN_9);
+tx.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP);
+tx.set_af(GPIO_AF_7);
+```
+
+> 即使在新外设封装类（如 `spi_port`）内部实现中，也必须组合 `io_ctrl` 对象来管理引脚，不得绕过它直接操作 GPIO 寄存器。
+
 ---
 
 ## 三、分层职责
