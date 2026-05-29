@@ -130,6 +130,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/timer_port.cpp        # 定时器驱动（基本定时 + PWM）
     interface/src/can_port.cpp          # CAN 总线驱动（阻塞收发）
     interface/src/i2c_hw_port.cpp       # 硬件 I2C 驱动（阻塞读写）
+    interface/src/adc_port.cpp          # ADC 驱动（阻塞单通道 + 扫描）
     interface/src/device_i2c_bus.cpp    # I2C 总线
     interface/src/device_i2c_dev.cpp    # I2C 设备基类
 

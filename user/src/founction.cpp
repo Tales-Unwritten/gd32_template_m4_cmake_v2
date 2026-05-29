@@ -14,6 +14,7 @@
 #include "w25q128_flash.hpp"
 #include "timer_port.hpp"
 #include "i2c_hw_port.hpp"
+#include "adc_port.hpp"
 #include "io_ctrl.hpp"
 #include "systick.h"
 #include <cstring>
@@ -50,20 +51,18 @@ void function_init(void) {
   // 先初始化调试串口（用于输出测试结果）
   DebugPort_Init();
 
-  // ── 硬件 I2C 压力测试（I2C0, PB6/PB7, 400kHz） ───
-  // PE2/PE3 不支持硬件 I2C AF，故用 I2C0 测试。与软 I2C1 总线独立。
+  // ── 硬件 I2C 总线扫描（仅扫描，不写 EEPROM） ───
   {
       i2c_hw_port i2c0({i2c_hw_id::i2c0, GPIOB, GPIO_PIN_6,
                          GPIOB, GPIO_PIN_7, GPIO_AF_4, 400000});
       i2c0.init();
 
-      // 简单测试：扫描 I2C0 总线，发地址看是否有 ACK
-      // 先测一个已知存在的地址：AT24C02 @ 0x50(7-bit)
+      // 总线扫描：找设备地址
       uint8_t found = 0;
       for (uint8_t addr = 0x02; addr < 0x7F; addr++) {
           i2c0.i2c_lock();
           i2c0.i2c_start();
-          i2c0.i2c_write_byte(addr << 1);  // 写地址
+          i2c0.i2c_write_byte(addr << 1);
           if (i2c0.i2c_wait_ack(500)) {
               found = addr;
               i2c0.i2c_stop();
@@ -74,31 +73,60 @@ void function_init(void) {
           i2c0.i2c_unlock();
       }
 
-      // 输出扫描结果
       debug_uart.send_data((const uint8_t *)"\r\n[HW_I2C] scan=", 17);
       for (int8_t n = 1; n >= 0; n--) {
           uint8_t hex = (found >> (n * 4)) & 0x0F;
           uint8_t ch = hex < 10 ? '0' + hex : 'A' + (hex - 10);
           debug_uart.send_data(&ch, 1);
       }
-
-      // 压力测试：读 EEPROM[0x00] 100 次
-      int errors = 0;
-      uint8_t ref_val = 0xFF;
-      i2c0.i2c_read_reg(0x50, 0x00, &ref_val, 1);  // 参考值
-      for (int i = 0; i < 100; i++) {
-          uint8_t data = 0x00;
-          i2c0.i2c_read_reg(0x50, 0x00, &data, 1);
-          if (data != ref_val) errors++;
-      }
-      debug_uart.send_data((const uint8_t *)", 100r ", 7);
-      uint8_t e1 = errors / 10 + '0';
-      uint8_t e2 = errors % 10 + '0';
-      debug_uart.send_data(&e1, 1);
-      debug_uart.send_data(&e2, 1);
-      debug_uart.send_data((const uint8_t *)"err\r\n", 5);
+      debug_uart.send_data((const uint8_t *)" (read-only)\r\n", 14);
 
       i2c0.deinit();
+  }
+
+  // ── ADC 测试（ADC0, PA0=CH0, PB3=CH3, 12-bit, 3.3V Vref） ───
+  {
+      adc_port adc({
+          adc_id::adc0, ADC_RESOLUTION_12B, ADC_DATAALIGN_RIGHT,
+          EXTERNAL_TRIGGER_DISABLE, 3300,
+          {{GPIOA, GPIO_PIN_0, ADC_CHANNEL_0, ADC_SAMPLETIME_144},
+           {GPIOB, GPIO_PIN_3, ADC_CHANNEL_3, ADC_SAMPLETIME_144}},
+          2
+      });
+      adc.init();
+      adc.calibrate();
+
+      uint16_t r0 = adc.read_raw(0); uint32_t m0 = adc.read_mv(0);
+      uint16_t r1 = adc.read_raw(1); uint32_t m1 = adc.read_mv(1);
+
+      debug_uart.send_data((const uint8_t *)"\r\n[ADC] CH0 raw=", 16);
+      for (int8_t n = 3; n >= 0; n--) {
+          uint8_t h = (r0 >> (n*4)) & 0x0F;
+          uint8_t c = h < 10 ? '0'+h : 'A'+(h-10);
+          debug_uart.send_data(&c, 1);
+      }
+      debug_uart.send_data((const uint8_t *)" mV=", 4);
+      {
+          uint8_t d[4]; uint32_t v = m0;
+          for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
+          debug_uart.send_data(d, 4);
+      }
+
+      debug_uart.send_data((const uint8_t *)", CH3 raw=", 9);
+      for (int8_t n = 3; n >= 0; n--) {
+          uint8_t h = (r1 >> (n*4)) & 0x0F;
+          uint8_t c = h < 10 ? '0'+h : 'A'+(h-10);
+          debug_uart.send_data(&c, 1);
+      }
+      debug_uart.send_data((const uint8_t *)" mV=", 4);
+      {
+          uint8_t d[4]; uint32_t v = m1;
+          for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
+          debug_uart.send_data(d, 4);
+      }
+      debug_uart.send_data((const uint8_t *)"\r\n", 2);
+
+      adc.deinit();
   }
 
   i2c_bus.i2c_init();
