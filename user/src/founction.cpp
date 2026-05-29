@@ -85,8 +85,45 @@ void function_init(void) {
       i2c0.deinit();
   }
 
-  // ── ADC 测试（ADC0, PA0=CH0, PB3=CH3, 12-bit, 3.3V Vref） ───
-  // PB3(JTDO) 可能需要关闭 JTAG 才能读取正确值
+  // ── DAC → ADC 回环测试（PA5 输出 1650mV → PA0 读回） ───
+  // 需要 PA5 和 PA0 物理连接
+  {
+      dac_port dac({
+          dac_id::dac0, 0, 0, GPIOA, GPIO_PIN_5,
+          EXTERNAL_TRIGGER_DISABLE, 3300
+      });
+      dac.init();
+      dac.set_mv(1, 1650);
+
+      adc_port adc({
+          adc_id::adc0, ADC_RESOLUTION_12B, ADC_DATAALIGN_RIGHT,
+          EXTERNAL_TRIGGER_DISABLE, 3300,
+          {{GPIOA, GPIO_PIN_0, ADC_CHANNEL_0, ADC_SAMPLETIME_144}},
+          1
+      });
+      adc.init();
+      adc.calibrate();
+
+      uint16_t r0 = adc.read_raw(0);
+      uint32_t m0 = adc.read_mv(0);
+
+      debug_uart.send_data((const uint8_t *)"\r\n[DAC->ADC] raw=", 17);
+      for (int8_t n = 3; n >= 0; n--) {
+          uint8_t h = (r0 >> (n*4)) & 0x0F;
+          uint8_t c = h < 10 ? '0'+h : 'A'+(h-10);
+          debug_uart.send_data(&c, 1);
+      }
+      debug_uart.send_data((const uint8_t *)" mV=", 4);
+      { uint8_t d[4]; uint32_t v = m0;
+        for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
+        debug_uart.send_data(d, 4); }
+      debug_uart.send_data((const uint8_t *)" (expect ~1650mV)\r\n", 19);
+
+      adc.deinit();
+      dac.deinit();
+  }
+
+  // ── ADC 独立测试（PA0=CH0, PB3=CH3） ───
   {
       adc_port adc({
           adc_id::adc0, ADC_RESOLUTION_12B, ADC_DATAALIGN_RIGHT,
@@ -108,11 +145,9 @@ void function_init(void) {
           debug_uart.send_data(&c, 1);
       }
       debug_uart.send_data((const uint8_t *)" mV=", 4);
-      {
-          uint8_t d[4]; uint32_t v = m0;
-          for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
-          debug_uart.send_data(d, 4);
-      }
+      { uint8_t d[4]; uint32_t v = m0;
+        for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
+        debug_uart.send_data(d, 4); }
 
       debug_uart.send_data((const uint8_t *)", CH3 raw=", 9);
       for (int8_t n = 3; n >= 0; n--) {
@@ -121,17 +156,15 @@ void function_init(void) {
           debug_uart.send_data(&c, 1);
       }
       debug_uart.send_data((const uint8_t *)" mV=", 4);
-      {
-          uint8_t d[4]; uint32_t v = m1;
-          for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
-          debug_uart.send_data(d, 4);
-      }
+      { uint8_t d[4]; uint32_t v = m1;
+        for (int8_t n = 3; n >= 0; n--) { d[n] = (v%10)+'0'; v/=10; }
+        debug_uart.send_data(d, 4); }
       debug_uart.send_data((const uint8_t *)"\r\n", 2);
 
       adc.deinit();
   }
 
-  // ── DAC 测试（PA5=CH1, 输出 1650mV ≈ VCC/2） ───
+  // ── DAC 独立测试（PA5=CH1, 持续输出 1650mV） ───
   {
       dac_port dac({
           dac_id::dac0, 0, 0, GPIOA, GPIO_PIN_5,

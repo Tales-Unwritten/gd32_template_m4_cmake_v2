@@ -43,9 +43,7 @@ void dac_port::init()
         if (!_has_ch[ch]) continue;
         uint32_t dac_ch = (ch == 0) ? DAC_OUT0 : DAC_OUT1;
 
-        dac_trigger_disable(_periph, dac_ch);
-        dac_wave_mode_config(_periph, dac_ch, DAC_WAVE_DISABLE);
-        dac_output_buffer_disable(_periph, dac_ch);
+        dac_output_buffer_enable(_periph, dac_ch);
         dac_enable(_periph, dac_ch);
     }
 
@@ -74,9 +72,6 @@ void dac_port::set_raw(uint8_t channel, uint16_t value)
 
     uint32_t dac_ch = (channel == 0) ? DAC_OUT0 : DAC_OUT1;
     dac_data_set(_periph, dac_ch, DAC_ALIGN_12B_R, value);
-    if (_cfg.trigger == DAC_TRIGGER_SOFTWARE) {
-        dac_software_trigger_enable(_periph, dac_ch);
-    }
 }
 
 void dac_port::set_mv(uint8_t channel, uint32_t mv)
