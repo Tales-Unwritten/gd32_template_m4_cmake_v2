@@ -50,7 +50,7 @@
 
 | 问题 | 文件 | 严重度 | 计划 |
 |------|------|--------|------|
-| `usart_port` 使用 `new[]` 堆分配 | `interface/src/usart_port.cpp` | 中 | Phase 1.1 |
+| `usart_port` 使用 `new[]` 堆分配 | `interface/src/usart_port.cpp` | ~~中~~→ ✅ | Phase 1.1 已完成 |
 | `device_i2c_bus` 用 `while(_busy)` 自旋锁 | `interface/src/device_i2c_bus.cpp` | 低 | Phase 1.2 |
 | `Hardware/` 有 12 个旧 C 驱动未编译 | `Hardware/src/*.c` | 信息 | 逐步迁移或清理 |
 
