@@ -156,9 +156,15 @@ void device_i2c_bus::i2c_write_ack(uint8_t AckValue)
 
 void device_i2c_bus::i2c_lock()
 {
-    while (_busy)
-        ;
+    // IRQ-safe spinlock：关中断保证原子性
+    uint32_t mask = __get_PRIMASK();
+    __disable_irq();
+    while (_busy) {
+        __set_PRIMASK(mask);  // 短暂恢复中断，让 ISR 运行
+        __disable_irq();
+    }
     _busy = 1;
+    __set_PRIMASK(mask);
 }
 
 void device_i2c_bus::i2c_unlock()
