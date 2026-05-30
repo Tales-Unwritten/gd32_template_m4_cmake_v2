@@ -31,6 +31,8 @@ struct CanPortConfig {
     uint32_t rx_pin;       ///< CAN RX 引脚掩码
     uint32_t af;           ///< 复用功能编号（CAN0/1 通常 AF9）
     uint32_t baudrate;     ///< 波特率: 125000, 250000, 500000, 1000000
+    uint32_t mode;         ///< CAN_NORMAL_MODE / CAN_LOOPBACK_MODE / CAN_SILENT_MODE
+    uint8_t  filter_bank;  ///< 过滤器起始 bank（CAN0=0, CAN1=15）
 };
 
 // ============================================================
@@ -94,6 +96,7 @@ public:
     // ── 查询 ──────────────────────────────────────────────
 
     [[nodiscard]] can_id periph() const noexcept { return _cfg.periph; }
+    [[nodiscard]] uint32_t hw() const noexcept { return _periph; }
 
 private:
     void _enable_clock();

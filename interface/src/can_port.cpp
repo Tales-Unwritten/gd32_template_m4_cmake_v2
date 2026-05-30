@@ -85,7 +85,7 @@ void can_port::init()
     // CAN 外设初始化
     can_parameter_struct can_cfg;
     can_struct_para_init(CAN_INIT_STRUCT, &can_cfg);
-    can_cfg.working_mode       = CAN_NORMAL_MODE;
+    can_cfg.working_mode       = _cfg.mode;
     can_cfg.resync_jump_width  = CAN_BT_SJW_1TQ;
     can_cfg.time_segment_1     = CAN_BT_BS1_8TQ;
     can_cfg.time_segment_2     = CAN_BT_BS2_7TQ;
@@ -100,20 +100,12 @@ void can_port::init()
     can_cfg.prescaler          = (_can_clock() + _cfg.baudrate * (1+8+7) / 2)
                                  / (_cfg.baudrate * (1+8+7));
 
-    can_init(_periph, &can_cfg);
+    // CAN1 必须分配过滤器 bank（必须在 can_init 之前）
+    if (_cfg.periph == can_id::can1) {
+        can1_filter_start_bank(_cfg.filter_bank);
+    }
 
-    // 配置滤波器（接收所有帧）
-    can_filter_parameter_struct filter;
-    can_struct_para_init(CAN_FILTER_STRUCT, &filter);
-    filter.filter_mode         = CAN_FILTERMODE_MASK;
-    filter.filter_bits         = CAN_FILTERBITS_32BIT;
-    filter.filter_list_high    = 0x0000;
-    filter.filter_list_low     = 0x0000;
-    filter.filter_mask_high    = 0x0000;
-    filter.filter_mask_low     = 0x0000;
-    filter.filter_fifo_number  = CAN_FIFO0;
-    filter.filter_enable       = ENABLE;
-    can_filter_init(&filter);
+    can_init(_periph, &can_cfg);
 
     _initialized = true;
 }
@@ -164,6 +156,11 @@ bool can_port::send(uint32_t id, bool is_ext, const uint8_t *data, uint8_t len)
     while (can_message_transmit(_periph, &tx_msg) == CAN_TRANSMIT_NOMAILBOX) {
         if (--timeout == 0) return false;
     }
+    // 等待发送完成（MTF0/1/2）
+    timeout = 0xFFFF;
+    while (!(CAN_TSTAT(_periph) & (CAN_TSTAT_MTF0 | CAN_TSTAT_MTF1 | CAN_TSTAT_MTF2))) {
+        if (--timeout == 0) return false;
+    }
     return true;
 }
 
@@ -181,13 +178,13 @@ bool can_port::recv(uint32_t &id, bool &is_ext, uint8_t *data, uint8_t &len)
 {
     if (!_initialized || !data) return false;
 
-    if (can_receive_message_length_get(_periph, CAN_FIFO0) == 0) {
+    if (can_receive_message_length_get(_periph, CAN_FIFO1) == 0) {
         return false;
     }
 
     can_receive_message_struct rx_msg;
     can_struct_para_init(CAN_RX_MESSAGE_STRUCT, &rx_msg);
-    can_message_receive(_periph, CAN_FIFO0, &rx_msg);
+    can_message_receive(_periph, CAN_FIFO1, &rx_msg);
 
     is_ext = (rx_msg.rx_ff == CAN_FF_EXTENDED);
     id     = is_ext ? rx_msg.rx_efid : rx_msg.rx_sfid;

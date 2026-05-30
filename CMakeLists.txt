@@ -146,7 +146,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     bsp/src/debug_port.cpp              # Debug 串口 (USART0)
     bsp/src/rs485_port.cpp              # RS485 串口 (USART1, DE=PG13)
     bsp/src/rs232_port.cpp              # RS232 串口 (USART2)
-    bsp/src/w25q128_flash.cpp           # W25Q128 Flash (SPI4)
+    bsp/src/w25q128.cpp               # W25Q128 Flash 全功能驱动
 
     # ── Modbus 协议栈 ───────────────────────────────
     middleware/modbus/src/modbus_crc.cpp         # CRC 校验
