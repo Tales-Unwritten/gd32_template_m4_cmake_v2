@@ -134,6 +134,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/dac_port.cpp          # DAC 驱动（双通道电压输出）
     interface/src/dma_port.cpp          # DMA 通道驱动（M2M + 外设）
     interface/src/exti_port.cpp         # 外部中断驱动
+    interface/src/wdt_port.cpp          # 看门狗驱动（IWDG + WWDG）
     interface/src/device_i2c_bus.cpp    # I2C 总线
     interface/src/device_i2c_dev.cpp    # I2C 设备基类
 
