@@ -116,6 +116,8 @@ IRQn_Type timer_port::_get_irq() const
         case timer_id::timer4: return TIMER4_IRQn;
 #ifdef TIMER5_IRQn
         case timer_id::timer5: return TIMER5_IRQn;
+#else
+        case timer_id::timer5: return TIMER6_IRQn;  // 降级到 TIMER6
 #endif
         case timer_id::timer6: return TIMER6_IRQn;
         case timer_id::timer7: return TIMER7_UP_TIMER12_IRQn;
@@ -175,10 +177,16 @@ void timer_port::init()
     timer_init(_periph, &timer_cfg);
 
     // PWM 通道配置
+    // GPIO AF 初始化
     for (uint8_t i = 0; i < _cfg.channel_count && i < 4; i++) {
         if (_cfg.channels[i].port == 0) continue;
 
-        // GPIO AF 初始化
+        // deinit 后重建：_ch_pins[i] 已被销毁为 nullptr
+        if (_ch_pins[i] == nullptr) {
+            _ch_pins[i] = new (_ch_storage[i].data)
+                io_ctrl(_cfg.channels[i].port, _cfg.channels[i].pin);
+        }
+
         _ch_pins[i]->init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
         _ch_pins[i]->set_af(_cfg.channels[i].af);
 

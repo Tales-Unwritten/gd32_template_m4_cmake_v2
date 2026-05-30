@@ -68,7 +68,7 @@ public:
 
 private:
     static bool _in_range(uint32_t addr, uint32_t len);
-    static void _wait_busy();
+    static bool _wait_busy();
 
     static uint32_t _safe_start;
     static uint32_t _safe_end;

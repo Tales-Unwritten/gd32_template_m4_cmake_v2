@@ -47,6 +47,11 @@ void adc_port::init()
 
     // GPIO: 模拟模式
     for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+        // deinit 后重建
+        if (_ch_pins[i] == nullptr && _cfg.channels[i].port != 0) {
+            _ch_pins[i] = new (_ch_storage[i].data)
+                io_ctrl(_cfg.channels[i].port, _cfg.channels[i].pin);
+        }
         if (_ch_pins[i]) {
             _ch_pins[i]->init(GPIO_MODE_ANALOG, GPIO_PUPD_NONE);
         }

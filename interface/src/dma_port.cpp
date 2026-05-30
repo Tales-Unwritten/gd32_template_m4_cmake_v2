@@ -15,7 +15,7 @@ static dma_channel_enum _to_ch(uint8_t channel)
 
 dma_channel::dma_channel(const DmaConfig &cfg)
     : _cfg(cfg), _initialized(false), _periph(0),
-      _width(DMA_MEMORY_WIDTH_8BIT),
+      _width(DMA_PERIPH_WIDTH_8BIT),
       _dir(DMA_MEMORY_TO_MEMORY),
       _src_inc(true), _dst_inc(true)
 {}
@@ -61,7 +61,7 @@ void dma_channel::start(void *src, void *dst, uint32_t count)
     dma_single_data_para_struct_init(&dma_cfg);
 
     dma_cfg.direction           = _dir;
-    dma_cfg.periph_memory_width = _width | _width;  // PWidth | MWidth
+    dma_cfg.periph_memory_width = _width;
     dma_cfg.number              = count;
     dma_cfg.priority            = _cfg.priority;
     dma_cfg.circular_mode       = DMA_CIRCULAR_MODE_DISABLE;

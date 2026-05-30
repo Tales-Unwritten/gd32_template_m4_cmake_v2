@@ -24,15 +24,22 @@ void flash_port::lock()
 
 bool flash_port::_in_range(uint32_t addr, uint32_t len)
 {
+    // 防整数溢出：先检查 len 是否超出剩余空间
+    if (len > (_safe_end - _safe_start)) return false;
     return (addr >= _safe_start) && ((addr + len) <= _safe_end);
 }
 
-void flash_port::_wait_busy()
+bool flash_port::_wait_busy()
 {
     uint32_t timeout = 0xFFFF;
     while (fmc_flag_get(FMC_FLAG_BUSY)) {
-        if (--timeout == 0) return;
+        if (--timeout == 0) {
+            fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR
+                          | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
+            return false;
+        }
     }
+    return true;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -41,14 +48,14 @@ void flash_port::_wait_busy()
 
 bool flash_port::erase(uint32_t addr)
 {
-    if (!_in_range(addr, 1)) return false;  // 安全检查
+    // 扇区擦除会清除整个扇区（最小 16KB），需要完整覆盖在安全区内
+    if (!_in_range(addr, 1)) return false;
 
     fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR
                   | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
 
     if (fmc_page_erase(addr) != FMC_READY) return false;
-    _wait_busy();
-    return true;
+    return _wait_busy();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -63,8 +70,7 @@ bool flash_port::write_word(uint32_t addr, uint32_t data)
                   | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
 
     if (fmc_word_program(addr, data) != FMC_READY) return false;
-    _wait_busy();
-    return true;
+    return _wait_busy();
 }
 
 bool flash_port::write_byte(uint32_t addr, uint8_t data)

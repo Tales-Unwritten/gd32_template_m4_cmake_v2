@@ -40,7 +40,7 @@ public:
     [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
 
     // ── 传输配置（在 start 之前调用） ──────────────────
-    void set_width(uint32_t width);     // DMA_MEMORY_WIDTH_8/16/32BIT
+    void set_width(uint32_t width);     // DMA_PERIPH_WIDTH_8/16/32BIT
     void set_direction(uint32_t dir);   // DMA_MEMORY_TO_MEMORY / PERIPH_TO_MEMORY / MEMORY_TO_PERIPH
     void set_increment(bool src_inc, bool dst_inc);
 

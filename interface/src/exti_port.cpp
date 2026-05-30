@@ -53,6 +53,8 @@ exti_port::~exti_port() { deinit(); }
 
 uint8_t exti_port::_pin_index() const
 {
+    if (_cfg.pin == 0) return 0xFF;  // 无效引脚
+
     // pin 是一个 bit，找到它是第几位
     uint32_t p = _cfg.pin;
     uint8_t n = 0;
@@ -77,6 +79,8 @@ void exti_port::_config_syscfg()
     else if (_cfg.port == GPIOE) port_src = EXTI_SOURCE_GPIOE;
     else if (_cfg.port == GPIOF) port_src = EXTI_SOURCE_GPIOF;
     else if (_cfg.port == GPIOG) port_src = EXTI_SOURCE_GPIOG;
+    else if (_cfg.port == GPIOH) port_src = EXTI_SOURCE_GPIOH;
+    else if (_cfg.port == GPIOI) port_src = EXTI_SOURCE_GPIOI;
 
     uint8_t pin_src = _line;  // EXTI_SOURCE_PIN0 ~ PIN15 = 0~15
     syscfg_exti_line_config(port_src, pin_src);

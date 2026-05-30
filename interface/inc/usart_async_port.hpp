@@ -372,8 +372,12 @@ void usart_async_port<RX_SIZE, TX_SIZE>::send_data_it(const uint8_t *data, uint1
 template <size_t RX_SIZE, size_t TX_SIZE>
 void usart_async_port<RX_SIZE, TX_SIZE>::rx_clear()
 {
+    // 关中断保护：防止 ISR 在写入之间修改 rx_flag/rx_len
+    uint32_t mask = __get_PRIMASK();
+    __disable_irq();
     _buf.rx_flag = 0;
     _buf.rx_len  = 0;
+    __set_PRIMASK(mask);
 }
 
 #endif /* __cplusplus */
