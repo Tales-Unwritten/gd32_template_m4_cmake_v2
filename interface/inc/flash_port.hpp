@@ -1,10 +1,6 @@
 #pragma once
 // ============================================================
 // @platform GD32F4xx
-//   移植到新 MCU 时替换 FMC API：
-//     fmc_unlock/lock → 目标 Flash 控制器 API
-//     fmc_page_erase / fmc_word_program
-//     FMU_FLASH_SIZE etc.
 // ============================================================
 
 #ifdef __cplusplus
@@ -13,28 +9,69 @@
 #include "gd32f4xx.h"
 
 /**
- * @brief 内部 Flash 读写（存储校准参数/序列号，替代 EEPROM）
+ * @brief 内部 Flash 安全读写
  *
- * 写入前必须先擦除所在扇区（扇区擦除粒度为 16KB~128KB）。
+ * 安全机制：所有写入/擦除操作限制在 init() 指定的安全区域内。
+ * 超出区域的操作直接返回 false，防止误擦固件。
  *
- *   flash_port::init();
- *   flash_port::erase(0x08010000);                      // 擦除扇区
- *   flash_port::write_word(0x08010000, 0x12345678);     // 写 32-bit
- *   uint32_t val = flash_port::read_word(0x08010000);   // 读 32-bit
+ * 使用示例：
+ *   // 使用 Flash 尾部 16KB 作为数据存储区
+ *   flash_port::init(0x08020000, 0x4000);   // 安全区：0x08020000~0x08023FFF
+ *
+ *   flash_port::erase(0x08020000);           // 擦除整个扇区
+ *   flash_port::write(0x08020000, 0xA5);     // 写 byte
+ *   uint8_t val = flash_port::read_byte(0x08020000);
  */
 class flash_port {
 public:
-    static void init();        ///< 解锁 Flash（写入前必须调用）
-    static void lock();        ///< 锁定 Flash
+    // ── 生命周期 ──────────────────────────────────────────
 
-    static bool erase(uint32_t page_addr);  ///< 扇区擦除
+    /** @brief 初始化 Flash 控制器并设置安全区域
+     *  @param safe_start  允许操作的起始地址
+     *  @param safe_size   安全区域大小（字节）
+     */
+    static void init(uint32_t safe_start, uint32_t safe_size);
+
+    /** @brief 锁定 Flash（操作完成后调用） */
+    static void lock();
+
+    // ── 擦除 ──────────────────────────────────────────────
+
+    /** @brief 擦除扇区（仅当 addr 在安全区域内）
+     *  @param addr 扇区内任意地址
+     *  @return 成功返回 true
+     */
+    static bool erase(uint32_t addr);
+
+    // ── 写入 ──────────────────────────────────────────────
+
+    /** @brief 写 32-bit 字 */
     static bool write_word(uint32_t addr, uint32_t data);
-    static bool write_words(uint32_t addr, const uint32_t *data, uint16_t count);
 
+    /** @brief 写 byte */
+    static bool write_byte(uint32_t addr, uint8_t data);
+
+    /** @brief 批量写 byte 数组（最多一页 256 字节） */
+    static bool write_bytes(uint32_t addr, const uint8_t *data, uint16_t len);
+
+    // ── 读取（直接内存访问，无需解锁） ────────────────────
+
+    static uint8_t  read_byte(uint32_t addr);
     static uint32_t read_word(uint32_t addr);
-    static void read_words(uint32_t addr, uint32_t *buf, uint16_t count);
+    static void     read_bytes(uint32_t addr, uint8_t *buf, uint16_t len);
 
-    static uint32_t page_size(); ///< 扇区大小（字节）
+    // ── 查询 ──────────────────────────────────────────────
+
+    static uint32_t safe_start() { return _safe_start; }
+    static uint32_t safe_end()   { return _safe_end; }
+    static uint32_t safe_size()  { return _safe_end - _safe_start; }
+
+private:
+    static bool _in_range(uint32_t addr, uint32_t len);
+    static void _wait_busy();
+
+    static uint32_t _safe_start;
+    static uint32_t _safe_end;
 };
 
 #endif

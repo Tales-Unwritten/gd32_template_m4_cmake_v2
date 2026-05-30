@@ -10,7 +10,7 @@
 #include "io_ctrl.hpp"
 #include "w25q128_flash.hpp"
 #include "timer_port.hpp"
-#include "exti_port.hpp"
+#include "flash_port.hpp"
 #include "systick.h"
 #include <cstring>
 #include <stdio.h>
@@ -30,9 +30,6 @@ w25q128_flash g_flash;
 timer_port g_tick_timer({
     timer_id::timer2, 59999, 999, {}, 0
 });
-
-// ── EXTI 测试：PA0 上升沿中断翻转 LED1（PC4） ────────────
-exti_port g_exti({GPIOA, GPIO_PIN_0, exti_trigger::rising});
 
 void _on_timer_tick(void *) {
     led3.toggle();
@@ -74,10 +71,58 @@ void function_init(void) {
   g_tick_timer.on_timeout(_on_timer_tick, nullptr);
   g_tick_timer.start();
 
-  // EXTI：PA0 上升沿 → 翻转 LED1
-  g_exti.init();
-  g_exti.on_interrupt([](void*) { led1.toggle(); });
-  g_exti.enable();
+  // ── Flash 安全测试（0x08040000, 256B 安全区） ────
+  // 原理：Flash 写前必须擦除（擦后全 0xFF），读-擦-写-读验证
+  {
+      uint32_t test_addr = 0x08040000;
+      flash_port::init(test_addr, 256);
+
+      // Step 1: 读擦除前的值
+      uint8_t before = flash_port::read_byte(test_addr);
+
+      // Step 2: 擦除
+      bool er_ok = flash_port::erase(test_addr);
+
+      // Step 3: 读擦除后的值（应为 0xFF）
+      uint8_t after_erase = flash_port::read_byte(test_addr);
+
+      // Step 4: 写测试值
+      bool wr_ok = flash_port::write_byte(test_addr, 0xA5);
+
+      // Step 5: 读回
+      uint8_t written = flash_port::read_byte(test_addr);
+
+      // Step 6: 4-byte 模式测试
+      const char *pattern = "FLSH";
+      bool wr4_ok = flash_port::write_bytes(test_addr + 4, (const uint8_t *)pattern, 4);
+      char readback[5] = {};
+      flash_port::read_bytes(test_addr + 4, (uint8_t *)readback, 4);
+
+      flash_port::lock();
+
+      // 输出结果
+      debug_uart.send_data((const uint8_t *)"\r\n[FLASH] before=", 16);
+      debug_uart.send_data(&before, 1);  // raw byte
+      debug_uart.send_data((const uint8_t *)" erase=", 7);
+      uint8_t er_ch = er_ok ? 'Y' : 'N';
+      debug_uart.send_data(&er_ch, 1);
+      debug_uart.send_data((const uint8_t *)" erased=", 8);
+      debug_uart.send_data(&after_erase, 1);
+      debug_uart.send_data((const uint8_t *)" write=", 7);
+      uint8_t wr_ch = wr_ok ? 'Y' : 'N';
+      debug_uart.send_data(&wr_ch, 1);
+      debug_uart.send_data((const uint8_t *)" value=0x", 9);
+      for (int8_t n = 1; n >= 0; n--) {
+          uint8_t h = (written >> (n*4)) & 0x0F;
+          uint8_t c = h < 10 ? '0'+h : 'A'+(h-10);
+          debug_uart.send_data(&c, 1);
+      }
+      bool pat_ok = (readback[0]=='F' && readback[1]=='L' && readback[2]=='S' && readback[3]=='H');
+      debug_uart.send_data((const uint8_t *)" pattern=", 9);
+      debug_uart.send_data((const uint8_t *)readback, 4);
+      debug_uart.send_data((const uint8_t *)(pat_ok ? " OK" : " FAIL"), pat_ok ? 3 : 5);
+      debug_uart.send_data((const uint8_t *)"\r\n", 2);
+  }
 }
 
 // ════════════════════════════════════════════════════════════
