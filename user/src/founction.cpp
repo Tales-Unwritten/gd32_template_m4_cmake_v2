@@ -10,6 +10,7 @@
 #include "io_ctrl.hpp"
 #include "w25q128_flash.hpp"
 #include "timer_port.hpp"
+#include "exti_port.hpp"
 #include "systick.h"
 #include <cstring>
 #include <stdio.h>
@@ -29,6 +30,9 @@ w25q128_flash g_flash;
 timer_port g_tick_timer({
     timer_id::timer2, 59999, 999, {}, 0
 });
+
+// ── EXTI 测试：PA0 上升沿中断翻转 LED1（PC4） ────────────
+exti_port g_exti({GPIOA, GPIO_PIN_0, exti_trigger::rising});
 
 void _on_timer_tick(void *) {
     led3.toggle();
@@ -69,6 +73,11 @@ void function_init(void) {
   g_tick_timer.init();
   g_tick_timer.on_timeout(_on_timer_tick, nullptr);
   g_tick_timer.start();
+
+  // EXTI：PA0 上升沿 → 翻转 LED1
+  g_exti.init();
+  g_exti.on_interrupt([](void*) { led1.toggle(); });
+  g_exti.enable();
 }
 
 // ════════════════════════════════════════════════════════════
