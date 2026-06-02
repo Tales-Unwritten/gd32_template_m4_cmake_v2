@@ -13,6 +13,9 @@
 #include "timer_port.hpp"
 #include "can_port.hpp"
 #include "systick.h"
+
+extern void can_test_poll();
+extern void can_slave_poll();
 #include <cstring>
 #include <stdio.h>
 
@@ -55,25 +58,7 @@ void function_init(void) {
 
   g_tick_timer.init(); g_tick_timer.on_timeout(_on_timer_tick, nullptr); g_tick_timer.start();
 
-  // ── CAN 回环测试 ───────────────────────────────────────
-  {
-      can_port can({can_id::can1, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_12,
-                    GPIO_AF_9, 500000, CAN_SILENT_LOOPBACK_MODE, 15});
-      can.init();
-
-      const uint8_t tx[8] = "CAN_OK!";
-      bool sent = can.send(0x123, false, tx, 8);
-      bool rdy  = can.rx_ready();
-      uint32_t id=0; bool ext=false; uint8_t rx[8]={0}, len=0;
-      bool ok = can.recv(id, ext, rx, len);
-
-      debug_uart.send_data((const uint8_t *)"\r\n[CAN] s=", 9);
-      uint8_t sc=sent?'1':'0'; debug_uart.send_data(&sc,1);
-      debug_uart.send_data((const uint8_t *)" rdy=", 5);
-      uint8_t rc=rdy?'1':'0'; debug_uart.send_data(&rc,1);
-
-      can.deinit();
-  }
+  // CAN test moved to interface_test_cmds.cpp via 'can_raw' command
 }
 
 // ════════════════════════════════════════════════════════════
@@ -107,6 +92,9 @@ void UpdateModbusRegisters(void) {
 #endif
 
 void function_loop(void) {
+  can_test_poll();
+  can_slave_poll();
+
   APP_PC_Task();
 #if ACTIVE_PROTOCOL == PROTOCOL_MODBUS
   UpdateModbusRegisters();

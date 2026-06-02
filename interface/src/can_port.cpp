@@ -92,7 +92,7 @@ void can_port::init()
     can_cfg.time_triggered     = DISABLE;
     can_cfg.auto_bus_off_recovery = ENABLE;
     can_cfg.auto_wake_up       = DISABLE;
-    can_cfg.auto_retrans        = ENABLE;
+    can_cfg.auto_retrans        = DISABLE;
     can_cfg.rec_fifo_overwrite = DISABLE;
     can_cfg.trans_fifo_order   = DISABLE;
     // 波特率 = CAN_CLK / prescaler / (1+TS1+TS2)
@@ -106,6 +106,20 @@ void can_port::init()
     }
 
     can_init(_periph, &can_cfg);
+
+    // 配置过滤器：接收所有帧 → FIFO0
+    can_filter_parameter_struct filter_cfg;
+    can_struct_para_init(CAN_FILTER_STRUCT, &filter_cfg);
+    filter_cfg.filter_number      = _cfg.filter_bank;
+    filter_cfg.filter_mode        = CAN_FILTERMODE_MASK;
+    filter_cfg.filter_bits        = CAN_FILTERBITS_32BIT;
+    filter_cfg.filter_list_high   = 0x0000;
+    filter_cfg.filter_list_low    = 0x0000;
+    filter_cfg.filter_mask_high   = 0x0000;
+    filter_cfg.filter_mask_low    = 0x0000;
+    filter_cfg.filter_fifo_number = CAN_FIFO0;
+    filter_cfg.filter_enable      = ENABLE;
+    can_filter_init(&filter_cfg);
 
     _initialized = true;
 }
@@ -178,13 +192,13 @@ bool can_port::recv(uint32_t &id, bool &is_ext, uint8_t *data, uint8_t &len)
 {
     if (!_initialized || !data) return false;
 
-    if (can_receive_message_length_get(_periph, CAN_FIFO1) == 0) {
+    if (can_receive_message_length_get(_periph, CAN_FIFO0) == 0) {
         return false;
     }
 
     can_receive_message_struct rx_msg;
     can_struct_para_init(CAN_RX_MESSAGE_STRUCT, &rx_msg);
-    can_message_receive(_periph, CAN_FIFO1, &rx_msg);
+    can_message_receive(_periph, CAN_FIFO0, &rx_msg);
 
     is_ext = (rx_msg.rx_ff == CAN_FF_EXTENDED);
     id     = is_ext ? rx_msg.rx_efid : rx_msg.rx_sfid;
