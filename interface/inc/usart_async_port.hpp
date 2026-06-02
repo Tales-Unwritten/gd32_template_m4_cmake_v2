@@ -45,9 +45,9 @@ struct uart_buffer_t {
     volatile uint16_t rx_len;     ///< 当前帧数据长度
     volatile uint8_t  rx_flag;    ///< 0=空闲  1=帧就绪（IDLE 触发）
 
-    const uint8_t   *tx_data;     ///< 待发送数据指针
-    uint16_t         tx_len;      ///< 待发送总字节数
-    uint16_t         tx_idx;      ///< 当前发送位置
+    const uint8_t   *tx_data;     ///< 用户待发送数据指针
+    volatile uint16_t tx_len;    ///< 待发送总字节数
+    volatile uint16_t tx_idx;    ///< 当前发送位置
     volatile uint8_t  tx_busy;    ///< 0=空闲  1=中断发送进行中
 };
 
@@ -64,8 +64,8 @@ struct usart_isr_ctx_t {
     volatile uint8_t     *rx_flag;      ///< → &_buf.rx_flag
     uint16_t              rx_capacity;  ///< 接收缓冲区容量
     const uint8_t        *tx_data;      ///< → _buf.tx_data
-    uint16_t              tx_len;       ///< → _buf.tx_len
-    uint16_t              tx_idx;       ///< → _buf.tx_idx
+    volatile uint16_t     tx_len;       ///< → _buf.tx_len
+    volatile uint16_t     tx_idx;       ///< → _buf.tx_idx
     volatile uint8_t     *tx_busy;      ///< → &_buf.tx_busy
 };
 

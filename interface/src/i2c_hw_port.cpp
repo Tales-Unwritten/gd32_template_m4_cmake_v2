@@ -160,7 +160,11 @@ void i2c_hw_port::i2c_restart()
 void i2c_hw_port::i2c_stop()
 {
     i2c_stop_on_bus(_periph);
-    while (i2c_flag_get(_periph, I2C_FLAG_STPDET)) {}
+    // 等待 STOP 条件已发送完成标志
+    uint32_t timeout = 0xFFFF;
+    while (!i2c_flag_get(_periph, I2C_FLAG_STPDET)) {
+        if (--timeout == 0) return;
+    }
     i2c_flag_clear(_periph, I2C_FLAG_STPDET);
 }
 
@@ -208,6 +212,11 @@ void i2c_hw_port::i2c_write_reg(uint8_t dev_addr_7bit, uint8_t reg,
 
     for (uint16_t i = 0; i < len; i++) {
         i2c_write_byte(data[i]);
+        // 数据阶段 NACK 检测：从机不应答则中止
+        if (i2c_flag_get(_periph, I2C_FLAG_AERR)) {
+            i2c_flag_clear(_periph, I2C_FLAG_AERR);
+            goto exit;
+        }
     }
 
 exit:

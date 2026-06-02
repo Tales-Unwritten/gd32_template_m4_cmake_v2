@@ -162,8 +162,12 @@ void exti_port::deinit()
 
 void exti_port::on_interrupt(callback_t cb, void *data)
 {
+    // 关中断保护：防止 ISR 在两次写入之间触发，拿到不一致的 cb + data
+    uint32_t mask = __get_PRIMASK();
+    __disable_irq();
     _cb = cb;
     _cb_data = data;
+    __set_PRIMASK(mask);
 }
 
 void exti_port::enable()  { if (_initialized) nvic_irq_enable(_get_irq(), 0, 0); }

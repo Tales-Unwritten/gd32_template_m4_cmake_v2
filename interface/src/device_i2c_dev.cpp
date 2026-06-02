@@ -98,9 +98,9 @@ exit:
 
 bool device_i2c_dev::i2c_freedom_read(uint8_t RegAdd, uint64_t *Data, uint8_t length)
 {
+    if (!Data || length == 0 || length > 8) return false;
     *Data = 0;
     bool success = false;
-    if (length == 0 || length > 8) return false;
 
     _bus->i2c_lock();
 

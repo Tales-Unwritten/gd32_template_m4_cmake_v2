@@ -100,3 +100,13 @@ void rtc_port::on_alarm(alarm_cb_t cb, void *data)
     _alarm_cb = cb;
     _alarm_data = data;
 }
+
+extern "C" void RTC_Alarm_IRQHandler(void)
+{
+    if (rtc_flag_get(RTC_FLAG_ALRM0) == SET) {
+        rtc_flag_clear(RTC_FLAG_ALRM0);
+        if (rtc_port::_alarm_cb) {
+            rtc_port::_alarm_cb(rtc_port::_alarm_data);
+        }
+    }
+}

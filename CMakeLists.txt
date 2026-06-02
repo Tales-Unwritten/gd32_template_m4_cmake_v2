@@ -111,6 +111,8 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     ${LIB_DIR}/Source/gd32f4xx_spi.c
     ${LIB_DIR}/Source/gd32f4xx_can.c
     ${LIB_DIR}/Source/gd32f4xx_i2c.c
+    ${LIB_DIR}/Source/gd32f4xx_rtc.c
+    ${LIB_DIR}/Source/gd32f4xx_pmu.c
 
     # ── 内核 / 调度 ─────────────────────────────────
     code/src/main.c

@@ -40,7 +40,7 @@ public:
     static void alarm_disable();
     static void on_alarm(alarm_cb_t cb, void *data = nullptr);
 
-private:
+    // ISR 可访问
     static alarm_cb_t _alarm_cb;
     static void      *_alarm_data;
 };

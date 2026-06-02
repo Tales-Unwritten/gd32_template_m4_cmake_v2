@@ -48,8 +48,16 @@ bool flash_port::_wait_busy()
 
 bool flash_port::erase(uint32_t addr)
 {
-    // 扇区擦除会清除整个扇区（最小 16KB），需要完整覆盖在安全区内
-    if (!_in_range(addr, 1)) return false;
+    // 扇区擦除会清除整个扇区，需确保整个扇区在安全区内
+    // GD32F470 扇区布局：
+    //   0x08000000~0x0800FFFF: 4×16KB  (Sector 0~3)
+    //   0x08010000~0x0801FFFF: 1×64KB  (Sector 4)
+    //   0x08020000~0x080FFFFF: 11×128KB (Sector 5~15)
+    uint32_t sector_end;
+    if (addr < 0x08010000)      sector_end = (addr & ~0x3FFF)  + 0x4000;
+    else if (addr < 0x08020000) sector_end = (addr & ~0xFFFF)  + 0x10000;
+    else                        sector_end = (addr & ~0x1FFFF) + 0x20000;
+    if (sector_end > _safe_end || addr < _safe_start) return false;
 
     fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR
                   | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
@@ -77,12 +85,17 @@ bool flash_port::write_byte(uint32_t addr, uint8_t data)
 {
     if (!_in_range(addr, 1)) return false;
 
-    // Flash 只支持 32-bit 写入，需要 read-modify-write
-    uint32_t word_addr = addr & ~0x3;          // 对齐到 4 字节
-    uint32_t shift     = (addr & 0x3) * 8;     // 字节偏移
-    uint32_t old_word  = *(volatile uint32_t *)word_addr;  // 读当前值
-    uint32_t new_word  = (old_word & ~(0xFFUL << shift)) | ((uint32_t)data << shift);
+    // Flash 只能将 bit 从 1 编程为 0，不能从 0 变为 1（需先擦除）
+    uint32_t word_addr = addr & ~0x3;
+    uint32_t shift     = (addr & 0x3) * 8;
+    uint32_t old_word  = *(volatile uint32_t *)word_addr;
+    uint32_t old_byte  = (old_word >> shift) & 0xFF;
+    uint32_t new_byte  = (uint32_t)data;
 
+    // 如果新值试图将 old_byte 中的某个 0 bit 改为 1，Flash 无法做到
+    if ((old_byte & new_byte) != new_byte) return false;
+
+    uint32_t new_word = (old_word & ~(0xFFUL << shift)) | (new_byte << shift);
     return write_word(word_addr, new_word);
 }
 

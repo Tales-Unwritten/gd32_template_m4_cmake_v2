@@ -51,6 +51,7 @@ public:
     void i2c_bus_recovery();
 
     void i2c_delay();
+    void i2c_deinit();
 
 private:
     void i2c_w_scl(uint8_t BitValue);

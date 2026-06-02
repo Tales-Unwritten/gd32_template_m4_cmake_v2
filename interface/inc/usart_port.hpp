@@ -35,8 +35,8 @@ struct uart_buffer_t
 
     /* ── 发送（ISR 内部使用，用户只读 tx_busy） ── */
     const uint8_t   *tx_data;    ///< 用户待发送数据指针
-    uint16_t         tx_len;     ///< 待发送总字节数
-    uint16_t         tx_idx;     ///< 当前发送位置
+    volatile uint16_t tx_len;   ///< 待发送总字节数
+    volatile uint16_t tx_idx;   ///< 当前发送位置
     volatile uint8_t  tx_busy;   ///< 0=空闲  1=中断发送进行中
 };
 
