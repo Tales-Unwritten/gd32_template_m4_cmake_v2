@@ -162,7 +162,6 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
 
     # ── 用户应用 ───────────────────────────────────
     user/src/founction.cpp              # 主循环 / 初始化
-    user/src/can_dual_test.cpp          # CAN 双板测试
 )
 
 # ============================================================

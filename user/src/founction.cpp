@@ -11,13 +11,7 @@
 #include "spi_port.hpp"
 #include "w25q128.hpp"
 #include "timer_port.hpp"
-#include "can_port.hpp"
 #include "systick.h"
-
-extern void can_test_poll();
-extern void can_slave_poll();
-#include <cstring>
-#include <stdio.h>
 
 device_i2c_bus i2c_bus({GPIOE, GPIOE, GPIO_PIN_2, GPIO_PIN_3}, 1);
 INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40);
@@ -57,8 +51,6 @@ void function_init(void) {
   debug_uart.send_data((const uint8_t *)(f_id==0xEF7018 ? " OK" : " FAIL"), f_id==0xEF7018 ? 3 : 5);
 
   g_tick_timer.init(); g_tick_timer.on_timeout(_on_timer_tick, nullptr); g_tick_timer.start();
-
-  // CAN test moved to interface_test_cmds.cpp via 'can_raw' command
 }
 
 // ════════════════════════════════════════════════════════════
@@ -92,9 +84,6 @@ void UpdateModbusRegisters(void) {
 #endif
 
 void function_loop(void) {
-  can_test_poll();
-  can_slave_poll();
-
   APP_PC_Task();
 #if ACTIVE_PROTOCOL == PROTOCOL_MODBUS
   UpdateModbusRegisters();
