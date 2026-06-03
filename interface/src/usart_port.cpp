@@ -260,7 +260,7 @@ static void _uart_isr(usart_port *port)
         usart_flag_clear(periph, USART_FLAG_NERR);
         usart_flag_clear(periph, USART_FLAG_PERR);
 
-        buf->rx_len = 0;                // 丢弃残缺帧
+        buf->rx_len = 0;  buf->rx_flag = 0;  // 丢弃残缺帧
     }
 
     /* ---- 发送：TBE ---- */

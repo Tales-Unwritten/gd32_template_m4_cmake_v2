@@ -209,3 +209,51 @@
 | 待重构 | `usart_port`（Phase 1.1） |
 
 **下一步**：开始 Phase 1.1 — 重构 `usart_port`，消除 `new[]`。
+
+---
+
+## 四、变更日志 (planB)
+
+### 2026-06-03 — Modbus 安全性加固 + 布局重构
+
+**modbus_t 布局重构**
+- `modbus_t` 头部字段对齐 `uart_buffer_t` 顺序（`rx_buf* | rx_len | rx_flag | tx_data* | ...`）
+- 实际存储数组移至 `rx_buf_arr[256]` / `tx_buf_arr[256]`
+- `Modbus_Init()` 中设置 `rx_buf` / `tx_data` 指针指向实际数组
+- 目的：`Modbus_FillData()` 可直接从串口 `uart_buffer_t` 对接字段
+
+**安全性修复（6 项）**
+| # | 位置 | 修复内容 |
+|---|------|----------|
+| 1 | `FrameProcess` | 恢复 `rx_len < 4` 检查，防止 CRC16 参数回绕越界 |
+| 2 | `Function03/04` | 增加 `quantity` 上限 `MODBUS_MAX_REG_QUANTITY=125` |
+| 3 | `Function16` | 增加帧长、数量、字节一致性三重校验 |
+| 4 | `FrameProcess` | 所有退出路径 + 最终统一清除 `rx_flag` |
+| 5 | `FillData` | `rx_len==0` 提前返回时清除 `buf->rx_flag`，防死循环 |
+| 6 | `Function03/04/06` | 增加 `rx_len >= 8` 帧长校验 |
+
+**接口统一**
+- `modbus.hpp`: `pc_receive_buffer_t` → `uart_buffer_t`
+- `modbus.hpp`: `#include "debug.hpp"` → `"debug_port.hpp"`
+- `modbus.cpp`: 端口表 `&pc_receive_buffer` → `debug_uart.buffer()`
+- `usart_port.cpp`: ISR 错误处理增加 `buf->rx_flag = 0`
+- CMakeLists: 剔除 `usart_async_port.cpp`，启用 `usart_port.cpp`
+
+**验证结果**
+- 冒烟测试 ✅ 回环/二进制完整
+- Modbus 0x06 ✅ 写1234→读回1234
+- Modbus 0x04 ✅ INA228 Temp=31.9°C
+- ACTIVE_PROTOCOL = PROTOCOL_MODBUS ✅
+
+---
+
+## 五、当前状态
+
+| 项目 | 状态 |
+|------|------|
+| 分支 | `planB`（当前工作分支） |
+| 编译 | ✅ 零错误 |
+| Modbus 0x03/0x06 读写 | ✅ |
+| Modbus 0x04 INA228 数据 | ✅ |
+| 安全性审查 | ✅ 已加固 |
+| usart_port 冒烟 | ✅ |

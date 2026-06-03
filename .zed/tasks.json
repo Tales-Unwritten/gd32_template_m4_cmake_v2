@@ -31,4 +31,16 @@
     "command": "sh -c 'rm -rf build && cmake --preset debug'",
     "cwd": "$ZED_WORKTREE_ROOT",
   },
+  {
+    "label": "OpenOCD Server",
+    "command": "openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+  },
+  {
+    "label": "GDB",
+    "command": "arm-none-eabi-gdb build/debug/gd32f470_template.elf -ex \"target remote localhost:3333\" -ex \"monitor reset halt\" -ex \"load\" -ex \"break main\" -ex \"continue\"",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+  },
 ]

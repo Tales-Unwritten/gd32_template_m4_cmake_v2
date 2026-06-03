@@ -3,7 +3,7 @@
 #include "link.h"
 
 #ifdef __cplusplus
-#include "usart_async_port.hpp"
+#include "usart_port.hpp"
 #include "debug_port.hpp"
 #endif
 

@@ -127,7 +127,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
 
     # ── 接口抽象层（C++ 核心驱动） ───────────────────
     interface/src/io_ctrl.cpp           # GPIO 引脚管理
-    interface/src/usart_async_port.cpp  # 异步串口驱动（含 ISR，零堆分配）
+    interface/src/usart_port.cpp        # 串口通用驱动（含 ISR）
     interface/src/spi_port.cpp          # SPI 主机驱动（阻塞全双工）
     interface/src/timer_port.cpp        # 定时器驱动（基本定时 + PWM）
     interface/src/can_port.cpp          # CAN 总线驱动（阻塞收发）
@@ -153,13 +153,13 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     # ── Modbus 协议栈 ───────────────────────────────
     middleware/modbus/src/modbus_crc.cpp         # CRC 校验
     middleware/modbus/src/modbus_map.cpp         # 寄存器映射表
-    middleware/modbus/src/modbus_port_cfg.cpp    # 端口配置（平台胶水）
+    # middleware/modbus/src/modbus_port_cfg.cpp  # 已内聚到 modbus.cpp
     middleware/modbus/src/modbus.cpp             # 协议核心（帧解析/功能码）
 
     # ── 应用协议层 ─────────────────────────────────
     App/src/private.cpp                 # 波特率存储管理
     App/src/protocol.cpp                # 多协议调度 + Modbus 寄存器刷新
-    App/src/protocol_string.cpp         # 字符串指令解析器
+    App/src/protocol_string.cpp  # requires INA228_2         # 字符串指令解析器
     App/src/pc_task.cpp                 # 任务入口（薄调度）
 
     # ── 用户应用 ───────────────────────────────────

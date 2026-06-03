@@ -1,18 +1,15 @@
 #include "founction.hpp"
-#include "usart_async_port.hpp"
+#include "usart_port.hpp"
 #include "debug_port.hpp"
 #include "protocol.hpp"
 #include "pc_task.hpp"
 #include "device_i2c_bus.hpp"
 #include "device_i2c_dev.hpp"
-#include "gd32f4xx_gpio.h"
 #include "ina228.hpp"
 #include "io_ctrl.hpp"
-#include "spi_port.hpp"
-#include "w25q128.hpp"
-#include "timer_port.hpp"
 #include "systick.h"
 
+/* ── 外设 ──────────────────────────────────────────── */
 device_i2c_bus i2c_bus({GPIOE, GPIOE, GPIO_PIN_2, GPIO_PIN_3}, 1);
 INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40);
 
@@ -20,40 +17,19 @@ io_ctrl led1(GPIOC, GPIO_PIN_4);
 io_ctrl led2(GPIOC, GPIO_PIN_5);
 io_ctrl led3(GPIOA, GPIO_PIN_7);
 
-spi_port g_flash_spi({
-    spi_id::spi4, GPIOF, GPIO_PIN_7, GPIOF, GPIO_PIN_9,
-    GPIOF, GPIO_PIN_8, GPIOF, GPIO_PIN_6,
-    RESET, GPIO_AF_5, SPI_PSC_2, SPI_CK_PL_HIGH_PH_2EDGE,
-    SPI_ENDIAN_MSB, SPI_FRAMESIZE_8BIT
-});
-w25q128 g_flash(g_flash_spi);
-
-timer_port g_tick_timer({timer_id::timer2, 59999, 999, {}, 0});
-
-void _on_timer_tick(void *) { led3.toggle(); }
-
-// ════════════════════════════════════════════════════════════
+/* ── 初始化 ──────────────────────────────────────────── */
 void function_init(void) {
-  DebugPort_Init();
-  i2c_bus.i2c_init();
-  INA228_2.init();
-
-  led1.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-  led2.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-  led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-
-  Protocol_Init();
-
-  g_flash_spi.init(); g_flash.init();
-  uint32_t f_id = g_flash.jedec_id();
-  debug_uart.send_data((const uint8_t *)"\r\n[BOOT] Flash ", 14);
-  for (int8_t n=5; n>=0; n--) { uint8_t h=(f_id>>(n*4))&0xF; uint8_t c=h<10?'0'+h:'A'+(h-10); debug_uart.send_data(&c,1); }
-  debug_uart.send_data((const uint8_t *)(f_id==0xEF7018 ? " OK" : " FAIL"), f_id==0xEF7018 ? 3 : 5);
-
-  g_tick_timer.init(); g_tick_timer.on_timeout(_on_timer_tick, nullptr); g_tick_timer.start();
+    DebugPort_Init();
+    i2c_bus.i2c_init();
+    INA228_2.init();
+    led1.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    led2.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    Protocol_Init();
+    debug_uart.send_data((const uint8_t *)"\r\n[BOOT] Ready\r\n", 14);
 }
 
-// ════════════════════════════════════════════════════════════
+/* ── INA228 → Modbus Input Registers ────────────────── */
 #if ACTIVE_PROTOCOL == PROTOCOL_MODBUS
 #include "modbus_map.hpp"
 enum {
@@ -83,11 +59,12 @@ void UpdateModbusRegisters(void) {
 }
 #endif
 
+/* ── 主循环 ──────────────────────────────────────────── */
 void function_loop(void) {
-  APP_PC_Task();
+    APP_PC_Task();
 #if ACTIVE_PROTOCOL == PROTOCOL_MODBUS
-  UpdateModbusRegisters();
+    UpdateModbusRegisters();
 #endif
-  led1.toggle(); led2.toggle();
-  delay_ms(10);
+    led1.toggle(); led2.toggle();
+    delay_ms(10);
 }

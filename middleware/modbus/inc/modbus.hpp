@@ -1,47 +1,55 @@
 #pragma once
+
 #ifdef __cplusplus
 
 #include "modbus_crc.hpp"
 #include "modbus_map.hpp"
+#include "debug_port.hpp"
 
 #include <stdint.h>
 
-#define MODBUS_SLAVE_ADDR 0x01
-
-#define MODBUS_RX_BUF_SIZE 256
-#define MODBUS_TX_BUF_SIZE 256
-
-/* Modbus 协议限制: 单次最多读/写 125 个寄存器 */
-#define MODBUS_MAX_REG_QUANTITY 125
-
-/* 异常码 */
-#define MODBUS_EXC_ILLEGAL_FUNCTION    0x01
-#define MODBUS_EXC_ILLEGAL_DATA_ADDR   0x02
-#define MODBUS_EXC_ILLEGAL_DATA_VALUE  0x03
+/*
+ * 协议常量
+ */
+#define MODBUS_SLAVE_ADDR        0x01  /* 从机地址 */
+#define MODBUS_RX_BUF_SIZE       256   /* 接收缓冲区字节数 */
+#define MODBUS_TX_BUF_SIZE       256   /* 发送缓冲区字节数 */
+#define MODBUS_MAX_REG_QUANTITY  125   /* 单次最大寄存器数量（Modbus 规范） */
 
 /* 发送函数指针类型 */
 typedef void (*modbus_send_fn)(uint8_t *buf, uint16_t len);
 
-/* 前向声明 —— 完整定义在 usart_async_port.hpp 中，避免头文件耦合 */
-struct uart_buffer_t;
-
+/*
+ * modbus_t —— 头部对齐 uart_buffer_t 布局
+ *
+ *   [rx_buf*] [rx_len] [rx_flag] [tx_data*] [tx_len] [tx_idx] [tx_busy]
+ *   [rx_buf_arr[256]] [tx_buf_arr[256]] [send]
+ *
+ *   Modbus_FillData() 直接从串口 uart_buffer_t 拷贝头部字段 + 数据。
+ */
 typedef struct
 {
-    uint16_t rx_len;
-    uint8_t  rx_flag;
-    uint8_t  rx_buf[MODBUS_RX_BUF_SIZE];
+    /* ── 串口兼容头部（和 uart_buffer_t 同序，方便字段对接）── */
+    uint8_t        *rx_buf;
+    volatile uint16_t rx_len;
+    volatile uint8_t  rx_flag;
+    uint8_t        *tx_data;
+    volatile uint16_t tx_len;
+    volatile uint16_t tx_idx;
+    volatile uint8_t  tx_busy;
 
-    uint16_t tx_len;
-    uint8_t  tx_busy;
-    uint8_t  tx_buf[MODBUS_TX_BUF_SIZE];
+    /* ── 实际存储数组 ── */
+    uint8_t  rx_buf_arr[MODBUS_RX_BUF_SIZE];
+    uint8_t  tx_buf_arr[MODBUS_TX_BUF_SIZE];
 
-    modbus_send_fn send; // 发送函数指针
+    /* ── Modbus 专用 ── */
+    modbus_send_fn send;
 
 } modbus_t;
 
 typedef struct
 {
-    uart_buffer_t  *buf;
+    uart_buffer_t  *buf;      /* 指向串口 buffer，Modbus_FillData 直接对接 */
     modbus_send_fn  send;
 } modbus_port_t;
 
