@@ -4,7 +4,7 @@
 支持 **Modbus RTU** 和 **ASCII 字符串指令** 双协议栈。
 
 > 开发板：MickeyPlus V2.0.0 (GD32F450ZGT6, 144-pin LQFP)
-> 引脚表：[PINOUT.md](PINOUT.md) | 开发规范：[.agents/skills/gd32-peripheral-wrapper/SKILL.md](.agents/skills/gd32-peripheral-wrapper/SKILL.md)
+> 引脚表：[docs/PINOUT.md](docs/PINOUT.md) | 开发规范：[.agents/skills/my-gd-skill/SKILL.md](.agents/skills/my-gd-skill/SKILL.md)
 
 ---
 

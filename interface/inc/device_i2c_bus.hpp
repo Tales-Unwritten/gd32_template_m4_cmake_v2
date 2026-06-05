@@ -1,14 +1,9 @@
 #pragma once
-// extern "C" {
-// #include "gd32f4xx.h"
-// }
 
 #ifdef __cplusplus
 
 #include <cstdint>
 #include "io_ctrl.hpp"
-
-#ifdef __cplusplus
 
 /**
  * @brief  I2C 总线引脚配置（GD32 平台）
@@ -66,6 +61,3 @@ private:
 };
 
 #endif /* __cplusplus */
-
-
-#endif

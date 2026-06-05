@@ -30,7 +30,7 @@ extern "C" {
  * ══════════════════════════════════════════════════════════ */
 #define PROTOCOL_NONE         0
 #define PROTOCOL_MODBUS       1
-#define PROTOCOL_MODBUS   2
+#define PROTOCOL_MODBUS       2
 /* 示例: #define PROTOCOL_CAN_OPEN  3  */
 /* 示例: #define PROTOCOL_CUSTOM    4  */
 

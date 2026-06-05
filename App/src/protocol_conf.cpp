@@ -16,7 +16,7 @@
  *       → YourNew_Task()    (protocol_your_new.cpp)  ← 新协议在此接入
  */
 
-#include "protocol.hpp"
+#include "protocol_conf.hpp"
 
 /* ══════════════════════════════════════════════════════════════
  *  DISPATCH — 每种协议仅需在此处添加一个 #elif 分支
@@ -60,4 +60,3 @@
 
 void Protocol_Init(void) { _proto_init(); }
 void Protocol_Task(void) { _proto_task(); }
-

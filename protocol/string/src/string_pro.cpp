@@ -1,3 +1,4 @@
+
 /**
  * @file    protocol_string.cpp
  * @brief   字符串指令协议 —— handler / 命令表 / 解析引擎
@@ -9,7 +10,7 @@
  *   发送框输入:   ina228_bus_voltage（不要手动加 \r\n）
  */
 
-#include "protocol.hpp"
+#include "string_pro.hpp"
 #include "debug_port.hpp"
 #include "usart_port.hpp"
 #include "ina228.hpp"
@@ -182,7 +183,7 @@ void StringCmd_Task(void)
 
     if (ok) {
         const char *reply = resp[0] ? resp : g_resp_buf;
-        debug_uart.send_data((const uint8_t *)reply, (uint16_t)strlen(reply));
+        (void)debug_uart.send_data((const uint8_t *)reply, (uint16_t)strlen(reply));
     }
 
     memset(g_resp_buf, 0, sizeof(g_resp_buf));

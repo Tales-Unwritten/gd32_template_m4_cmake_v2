@@ -1,5 +1,8 @@
 #include "ina226.hpp"
 #include "link.h"
+#include "usart_port.hpp"
+
+extern usart_port debug_uart;
 
 #include <cstdio>
 #include <new>
@@ -296,31 +299,31 @@ void INA226::dumpRawRegisters(const INA226_Snapshot& s)
 
     len = snprintf(buf, sizeof(buf),
                    "\r\n========== INA226 RAW ==========\r\n");
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "CONFIG   : 0x%04X\r\n", s.config);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "VSHUNT   : 0x%04X\r\n", s.shuntVoltage);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "VBUS     : 0x%04X\r\n", s.busVoltage);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "CURRENT  : 0x%04X\r\n", s.current);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "POWER    : 0x%04X\r\n", s.power);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "CAL      : 0x%04X\r\n", s.calibration);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "MASK/EN  : 0x%04X\r\n", s.maskEnable);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "ALERTLIM : 0x%04X\r\n", s.alertLimit);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 }
 
 void INA226::dumpEngineeringData(const INA226_Snapshot& s)
@@ -335,23 +338,23 @@ void INA226::dumpEngineeringData(const INA226_Snapshot& s)
 
     len = snprintf(buf, sizeof(buf),
                    "\r\n========== INA226 ENGINEERING ==========\r\n");
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "Bus Voltage    : %ld.%03ld V\r\n",
                    (long)bus_mV / 1000, (long)bus_mV % 1000);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "Shunt Voltage  : %ld.%03ld mV\r\n",
                    (long)shunt_uV / 1000, (long)shunt_uV % 1000);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "Current        : %ld.%03ld A\r\n",
                    (long)current_mA / 1000, (long)current_mA % 1000);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 
     len = snprintf(buf, sizeof(buf), "Power          : %ld.%03ld W\r\n",
                    (long)power_mW / 1000, (long)power_mW % 1000);
-    debug_uart.send_data((const uint8_t*)buf, len);
+    (void)debug_uart.send_data((const uint8_t*)buf, len);
 }
 
 void INA226::dumpRegisters()

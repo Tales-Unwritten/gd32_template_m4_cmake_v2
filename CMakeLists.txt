@@ -151,15 +151,19 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     bsp/src/w25q128.cpp               # W25Q128 Flash 全功能驱动
 
     # ── Modbus 协议栈 ───────────────────────────────
-    middleware/modbus/src/modbus_crc.cpp         # CRC 校验
-    middleware/modbus/src/modbus_map.cpp         # 寄存器映射表
-    # middleware/modbus/src/modbus_port_cfg.cpp  # 已内聚到 modbus.cpp
-    middleware/modbus/src/modbus.cpp             # 协议核心（帧解析/功能码）
+    protocol/modbus/src/modbus_crc.cpp         # CRC 校验
+    protocol/modbus/src/modbus_map.cpp         # 寄存器映射表
+    # protocol/modbus/src/modbus_port_cfg.cpp  # 已内聚到 modbus.cpp
+    protocol/modbus/src/modbus.cpp             # 协议核心（帧解析/功能码）
+
+    protocol/string/src/string_pro.cpp         # 字符串指令解析器
+
+
+    protocol/hex/src/hex.cpp         # hex指令解析器
 
     # ── 应用协议层 ─────────────────────────────────
     App/src/private.cpp                 # 波特率存储管理
-    App/src/protocol.cpp                # 多协议调度 + Modbus 寄存器刷新
-    App/src/protocol_string.cpp  # requires INA228_2         # 字符串指令解析器
+    App/src/protocol_conf.cpp                # 多协议调度 + Modbus 寄存器刷新
     App/src/pc_task.cpp                 # 任务入口（薄调度）
 
     # ── 用户应用 ───────────────────────────────────
@@ -185,7 +189,9 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
     interface/inc
     bsp/inc
     user/inc
-    middleware/modbus/inc
+    protocol/modbus/inc
+    protocol/string/inc
+    protocol/hex/inc
     App/inc
 )
 

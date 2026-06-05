@@ -1,0 +1,13 @@
+{
+  "lsp": {
+    "clangd": {
+      "initialization_options": {
+        "clangd": {
+          "background_index": true,
+          "clang_tidy": false
+        }
+      },
+      "settings": {}
+    }
+  }
+}

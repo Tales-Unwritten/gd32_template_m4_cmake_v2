@@ -45,6 +45,8 @@ struct uart_buffer_t
 class usart_port
 {
 public:
+    static constexpr uint16_t TX_BUF_SIZE = 256;   ///< 内部发送缓冲区大小
+
     explicit usart_port(const UsartPortConfig &cfg);
     ~usart_port();
 
@@ -59,11 +61,13 @@ public:
 
     // ── 发送 ──────────────────────────────────────────────
 
-    /** @brief 阻塞发送 */
-    void send_data(const uint8_t *data, uint16_t len);
+    /** @brief 阻塞发送（超时保护）
+     *  @return true=发送成功  false=参数错误或超时 */
+    bool send_data(const uint8_t *data, uint16_t len);
 
-    /** @brief 中断发送（非阻塞），通过 buf->tx_busy 判断完成 */
-    void send_data_it(const uint8_t *data, uint16_t len);
+    /** @brief 中断发送（非阻塞），通过 buf->tx_busy 判断完成
+     *  @return true=已启动  false=参数错误或正在发送中 */
+    bool send_data_it(const uint8_t *data, uint16_t len);
 
     // ── 缓冲区访问 ────────────────────────────────────────
 
@@ -96,6 +100,9 @@ private:
 
     // 暴露给用户和 ISR 的缓冲区视图
     uart_buffer_t   _buf;
+
+    // 内部发送缓冲区（零堆分配，防止用户指针生命周期悬空）
+    uint8_t         _tx_buf[TX_BUF_SIZE];
 };
 
 #endif /* __cplusplus */

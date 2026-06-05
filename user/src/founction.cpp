@@ -1,7 +1,7 @@
 #include "founction.hpp"
 #include "usart_port.hpp"
 #include "debug_port.hpp"
-#include "protocol.hpp"
+#include "protocol_conf.hpp"
 #include "pc_task.hpp"
 #include "device_i2c_bus.hpp"
 #include "device_i2c_dev.hpp"
@@ -26,7 +26,7 @@ void function_init(void) {
     led2.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     Protocol_Init();
-    debug_uart.send_data((const uint8_t *)"\r\n[BOOT] Ready\r\n", 14);
+    (void)debug_uart.send_data((const uint8_t *)"\r\n[BOOT] Ready\r\n", 14);
 }
 
 /* ── INA228 → Modbus Input Registers ────────────────── */

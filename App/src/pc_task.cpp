@@ -4,7 +4,7 @@
  */
 
 #include "pc_task.hpp"
-#include "protocol.hpp"
+#include "protocol_conf.hpp"
 
 void APP_PC_Task(void)
 {

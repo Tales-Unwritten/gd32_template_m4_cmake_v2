@@ -6,6 +6,7 @@
 #include "gd32f4xx_misc.h"
 
 #include <new>
+#include <cstring>
 
 // ============================================================
 //  文件内全局：端口映射表（ISR 通过它找到对应实例）
@@ -110,7 +111,8 @@ void usart_port::init()
 {
     if (_initialized) return;
 
-    // 分配缓冲区
+    // [LEGACY] 堆分配缓冲区 - 历史遗留代码
+    // 新外设应使用 usart_async_port 模板类（零堆分配）
     _rx_buf_size = _cfg.rx_buf_size;
     _rx_heap_buf = new (std::nothrow) uint8_t[_rx_buf_size];
     if (!_rx_heap_buf) return;
@@ -182,40 +184,55 @@ void usart_port::deinit()
 }
 
 // ============================================================
-//  阻塞发送
+//  阻塞发送（超时保护）
 // ============================================================
 
-void usart_port::send_data(const uint8_t *data, uint16_t len)
+bool usart_port::send_data(const uint8_t *data, uint16_t len)
 {
-    if (!_initialized || !data || len == 0) return;
+    if (!_initialized || !data || len == 0) return false;
 
     usart_interrupt_disable(_cfg.usart_periph, USART_INT_TBE);
     usart_interrupt_disable(_cfg.usart_periph, USART_INT_TC);
 
     for (uint16_t i = 0; i < len; ++i)
     {
-        while (RESET == usart_flag_get(_cfg.usart_periph, USART_FLAG_TBE));
+        uint32_t timeout = 0xFFFF;
+        while (RESET == usart_flag_get(_cfg.usart_periph, USART_FLAG_TBE))
+        {
+            if (--timeout == 0) return false;   // 超时，防止硬件异常挂死
+        }
         usart_data_transmit(_cfg.usart_periph, data[i]);
     }
-    while (RESET == usart_flag_get(_cfg.usart_periph, USART_FLAG_TC));
+    {
+        uint32_t timeout = 0xFFFF;
+        while (RESET == usart_flag_get(_cfg.usart_periph, USART_FLAG_TC))
+        {
+            if (--timeout == 0) return false;   // 超时，防止硬件异常挂死
+        }
+    }
+    return true;
 }
 
 // ============================================================
-//  中断发送
+//  中断发送（内部拷贝，安全）
 // ============================================================
 
-void usart_port::send_data_it(const uint8_t *data, uint16_t len)
+bool usart_port::send_data_it(const uint8_t *data, uint16_t len)
 {
-    if (!_initialized || !data || len == 0) return;
-    if (_buf.tx_busy) return;
+    if (!_initialized || !data || len == 0) return false;
+    if (_buf.tx_busy) return false;            // 正在发送中
+    if (len > TX_BUF_SIZE) return false;        // 内部缓冲区不足
 
-    _buf.tx_data = data;
+    // 内部拷贝：防止用户释放缓冲区后 ISR 访问野指针
+    memcpy(_tx_buf, data, len);
+    _buf.tx_data = _tx_buf;                    // 指向内部缓冲区
     _buf.tx_len  = len;
     _buf.tx_idx  = 0;
     _buf.tx_busy = 1;
 
     usart_interrupt_enable(_cfg.usart_periph, USART_INT_TBE);
     usart_interrupt_enable(_cfg.usart_periph, USART_INT_TC);
+    return true;
 }
 
 // ============================================================

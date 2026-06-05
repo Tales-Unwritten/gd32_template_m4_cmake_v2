@@ -68,8 +68,10 @@ timer_port::timer_port(const TimerPortConfig &cfg)
     , _timeout_cb_data(nullptr)
 {
     // placement new: 在 aligned storage 上构造实际使用的通道
-    for (uint8_t i = 0; i < 4; i++) {
-        if (i < cfg.channel_count && cfg.channels[i].port != 0) {
+    // [FIX] 限制 channel_count 最大为 4，防止数组越界
+    uint8_t count = (cfg.channel_count > 4) ? 4 : cfg.channel_count;
+    for (uint8_t i = 0; i < count; i++) {
+        if (cfg.channels[i].port != 0) {
             _ch_pins[i] = new (_ch_storage[i].data)
                 io_ctrl(cfg.channels[i].port, cfg.channels[i].pin);
         }
