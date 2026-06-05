@@ -37,9 +37,7 @@
 
 #elif ACTIVE_PROTOCOL == PROTOCOL_STRING_CMD
 /* ── ASCII 字符串指令协议 ───────────────────────────────────── */
-/* 实现位于 protocol_string.cpp，此处仅前向声明 */
-   void StringCmd_Init(void);
-   void StringCmd_Task(void);
+#  include "string_pro.hpp"
    static void _proto_init(void) { StringCmd_Init(); }
    static void _proto_task(void) { StringCmd_Task(); }
 

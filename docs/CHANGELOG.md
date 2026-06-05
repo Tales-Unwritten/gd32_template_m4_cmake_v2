@@ -1,6 +1,32 @@
 # Changelog
 
-## 2026-06-05 — usart_port 安全性加固（方案A）
+## 2026-06-05 — 字符串协议重构（多端口 + 命令框架）
+
+### 重构内容
+
+将旧版 `string_pro.cpp`（硬编码 debug_uart，命令名含 \r\n）拆分为分层架构：
+
+| 文件 | 职责 |
+|------|------|
+| `protocol/string/inc/str_cmd.h` | 命令框架头文件（新增） |
+| `protocol/string/src/str_cmd.c` | 框架实现 + 命令表 + handler（新增） |
+| `protocol/string/inc/string_pro.hpp` | 多端口桥接层接口（重写） |
+| `protocol/string/src/string_pro.cpp` | 桥接层实现，遍历端口表、数据路由（重写） |
+
+### 关键改进
+
+| 改进 | 旧版 | 新版 |
+|------|------|------|
+| 多端口 | 硬编码 `debug_uart` | `string_ports[]` 端口表，与 Modbus 模式一致 |
+| 数据路由 | 固定走 debug | 从哪个口来，从哪个口回 |
+| 命令名 | 含 `\r\n` | 解析时自动去除 `\r\n` |
+| 命令增删 | 改多处代码 | 只改 `str_cmd.c` 一个文件 |
+| 参数支持 | 无 | 支持空格分隔的参数 |
+| 错误提示 | 静默失败 | 返回 `Error: unknown command` |
+
+### 关联修复
+
+- `App/inc/protocol_conf.hpp`：修复 `PROTOCOL_MODBUS` 重复定义（第32行和第33行），添加 `PROTOCOL_STRING_CMD=2`
 
 ### usart_port 接口变更
 

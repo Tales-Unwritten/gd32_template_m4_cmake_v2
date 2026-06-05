@@ -1,0 +1,114 @@
+{
+  "type": "quick_cmds",
+  "version": 1,
+  "commands": [
+    {
+      "seq": 1,
+      "description": "",
+      "data": "ina228_bus_voltage",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 2,
+      "description": "",
+      "data": "ina228_current",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 3,
+      "description": "",
+      "data": "ina228_power",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 4,
+      "description": "",
+      "data": "ina228_temperature",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 5,
+      "description": "",
+      "data": "ina228_energy",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 6,
+      "description": "",
+      "data": "ina228_charge",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 7,
+      "description": "",
+      "data": "ina228_mfr_id",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 8,
+      "description": "",
+      "data": "ina228_device_id",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 9,
+      "description": "",
+      "data": "ina228_alert",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 10,
+      "description": "",
+      "data": "ina228_shunt_voltage",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 11,
+      "description": "",
+      "data": "ina228_clear_alert",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    },
+    {
+      "seq": 12,
+      "description": "",
+      "data": "ina228_all",
+      "fmt": "ASCII",
+      "crlf": true,
+      "crc": false,
+      "selected": true
+    }
+  ]
+}

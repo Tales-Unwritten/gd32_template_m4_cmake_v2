@@ -157,6 +157,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     protocol/modbus/src/modbus.cpp             # 协议核心（帧解析/功能码）
 
     protocol/string/src/string_pro.cpp         # 字符串指令解析器
+    protocol/string/src/str_cmd.cpp             # 字符串命令框架
 
 
     protocol/hex/src/hex.cpp         # hex指令解析器

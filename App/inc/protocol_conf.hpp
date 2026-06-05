@@ -30,13 +30,11 @@ extern "C" {
  * ══════════════════════════════════════════════════════════ */
 #define PROTOCOL_NONE         0
 #define PROTOCOL_MODBUS       1
-#define PROTOCOL_MODBUS       2
-/* 示例: #define PROTOCOL_CAN_OPEN  3  */
-/* 示例: #define PROTOCOL_CUSTOM    4  */
+#define PROTOCOL_STRING_CMD   2
 
 /** @brief 当前活跃协议（修改此宏后重新编译即可切换） */
 #ifndef ACTIVE_PROTOCOL
-#  define ACTIVE_PROTOCOL  PROTOCOL_MODBUS
+#define ACTIVE_PROTOCOL  PROTOCOL_STRING_CMD
 #endif
 
 /* ══════════════════════════════════════════════════════════

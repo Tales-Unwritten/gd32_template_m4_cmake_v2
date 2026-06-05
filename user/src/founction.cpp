@@ -66,5 +66,5 @@ void function_loop(void) {
     UpdateModbusRegisters();
 #endif
     led1.toggle(); led2.toggle();
-    delay_ms(10);
+    // delay_ms(10);
 }
