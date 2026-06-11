@@ -16,7 +16,7 @@
 
 #include "string_pro.hpp"
 #include "str_cmd.hpp"
-#include "debug_port.hpp"
+#include "device_debug.hpp"
 #include <cstring>
 
 #if ACTIVE_PROTOCOL == PROTOCOL_STRING_CMD

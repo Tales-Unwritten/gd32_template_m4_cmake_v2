@@ -16,7 +16,7 @@
 #include "modbus.hpp"
 #include <cstring>
 
-#include "debug_port.hpp"
+#include "device_debug.hpp"
 
 /**
 01  Read Coil                        // 读取线圈状态

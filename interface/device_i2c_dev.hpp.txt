@@ -1,14 +1,14 @@
 
 #pragma once
 
-#include "device_i2c_bus.hpp"
+#include "inter_i2c_bus.hpp"
 
 #ifdef __cplusplus
 
-class device_i2c_dev
+class inter_i2c_dev
 {
 public:
-    device_i2c_dev(device_i2c_bus *bus, uint8_t addr);
+    inter_i2c_dev(inter_i2c_bus *bus, uint8_t addr);
 
     void     i2c_write_16bit(uint8_t RegAdd, uint16_t Data);
     uint16_t i2c_read_16bit(uint8_t RegAdd);
@@ -17,7 +17,7 @@ public:
     bool     i2c_freedom_read(uint8_t RegAdd, uint64_t *Data, uint8_t length);
 
 private:
-    device_i2c_bus *_bus;
+    inter_i2c_bus *_bus;
     uint8_t _addr;
 };
 

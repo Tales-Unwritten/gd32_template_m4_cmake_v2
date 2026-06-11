@@ -23,7 +23,7 @@ interface/                     ← 硬件资源抽象层（当前唯一适配层
         ↓
 transport/                     ← [规划中] DMA / Async / Ringbuffer 扩展层
         ↓                          当前不依赖此层，新代码在 interface/ 完成
-bsp/                           ← 设备驱动层
+device/                           ← 设备驱动层
         ↓
 app/ + user/                   ← 业务逻辑 + 初始化
 ```
@@ -50,12 +50,12 @@ app/ + user/                   ← 业务逻辑 + 初始化
 
 以下层级**严禁直接调用任何 `gd32f4xx_*.h` 中的函数**：
 
-- `bsp/`、`app/`、`user/`
+- `device/`、`app/`、`user/`
 - `transport/`（未来）
 - `middleware/`
 
 ```cpp
-// ❌ 禁止（出现在 bsp/app/user 层的任何文件）
+// ❌ 禁止（出现在 device/app/user 层的任何文件）
 #include "gd32f4xx_usart.h"
 usart_data_transmit(USART0, data);
 
@@ -97,8 +97,8 @@ ISR 中**只允许**以下操作：
 
 本项目实际拆分：
 ```
-interface/    usart_port, spi_port, device_i2c_bus  ← 硬件抽象
-bsp/          debug_port, rs485_port, ina228        ← 设备驱动
+interface/    usart_port, spi_port, inter_i2c_bus  ← 硬件抽象
+device/          debug_port, rs485_port, ina228        ← 设备驱动
 middleware/   modbus                                 ← 协议栈
 ```
 
@@ -125,9 +125,9 @@ tx.set_af(GPIO_AF_7);
 |------|------|------|
 | **Firmware** | `Firmware/` | GD32 SDK + CMSIS，只读不修改 |
 | **interface** | `interface/` | 外设资源抽象（时钟、GPIO、寄存器、IRQ） |
-| **bsp** | `bsp/` | 设备驱动（INA228、debug/rs485/rs232 串口） |
+| **device** | `device/` | 设备驱动（INA228、debug/rs485/rs232 串口） |
 | **middleware** | `middleware/` | Modbus RTU 协议栈 |
-| **app** | `App/` | 多协议调度、PC 任务入口 |
+| **app** | `app/` | 多协议调度、PC 任务入口 |
 | **user** | `user/` | 主循环、初始化 |
 
 > `transport/`（DMA/Async）为规划层，当前未创建。
@@ -170,7 +170,7 @@ struct uart_buffer_t {
 
 ### 4.3 ISR 规范（项目实际）
 
-- 所有 USART ISR 定义在 `interface/src/usart_port.cpp` 内
+- 所有 USART ISR 定义在 `interface/src/inter_usart.cpp` 内
 - 使用全局端口映射表 `g_port_map[]` 分发
 - `gd32f4xx_it.c` 中不包含任何 USART ISR
 
@@ -203,7 +203,7 @@ class usart_async_port {
 
 ## 六、I2C 总线规范
 
-### 软 I2C（device_i2c_bus，当前使用）
+### 软 I2C（inter_i2c_bus，当前使用）
 
 - 基于 GPIO 位反转（io_ctrl 管理 SCL/SDA 引脚）
 - 开漏输出 + 内部上拉
@@ -311,6 +311,18 @@ enum class usart_id : uint8_t {
 | 私有方法 | 下划线前缀 | `_enable_clock()` |
 | 文件名 | 全小写 + 下划线 | `usart_port.hpp` |
 
+### 文件夹与文件命名
+
+所有文件夹和文件名必须使用**全小写 + 下划线**风格，严禁使用大写字母：
+
+| 元素 | 规则 | 示例 |
+|------|------|------|
+| 文件夹名 | 全小写 | `interface/`、`hardware/`、`app/` |
+| 文件名 | 全小写 + 下划线 | `inter_usart.hpp`、`device_debug.hpp` |
+| 文档文件 | 全小写 | `changelog.md`、`readme.md` |
+
+例外：`CMakeLists.txt`、`CMakePresets.json` 等构建系统标准文件名不受此限。
+
 ---
 
 ## 十二、当前外设封装状态
@@ -319,8 +331,8 @@ enum class usart_id : uint8_t {
 |------|------|------|
 | GPIO | `io_ctrl` | ✅ 生产 |
 | USART | `usart_port` | ✅ 生产 |
-| I2C 软 | `device_i2c_bus` | ✅ 生产 |
-| I2C 设备 | `device_i2c_dev` | ✅ 生产 |
+| I2C 软 | `inter_i2c_bus` | ✅ 生产 |
+| I2C 设备 | `inter_i2c_dev` | ✅ 生产 |
 | INA228 | `INA228` | ✅ 生产 |
 | SPI | `spi_port` | ✅ 生产 |
 | Timer | `timer_port` | ✅ 生产 |
@@ -344,10 +356,10 @@ enum class usart_id : uint8_t {
 
 | 文件 | 核心模式 |
 |------|----------|
-| `interface/inc/io_ctrl.hpp` + `.cpp` | 单引脚封装基类、RAII 生命周期 |
-| `interface/inc/usart_port.hpp` + `.cpp` | 外设封装 + ISR 内聚 + 全局映射表 |
-| `interface/inc/device_i2c_bus.hpp` + `.cpp` | io_ctrl 组合、软协议、锁模式 |
-| `bsp/inc/ina228.hpp` + `bsp/src/ina228.cpp` | BSP 驱动，依赖 interface 对象 |
+| `interface/inc/inter_io_ctrl.hpp` + `.cpp` | 单引脚封装基类、RAII 生命周期 |
+| `interface/inc/inter_usart.hpp` + `.cpp` | 外设封装 + ISR 内聚 + 全局映射表 |
+| `interface/inc/inter_i2c_bus.hpp` + `.cpp` | io_ctrl 组合、软协议、锁模式 |
+| `device/inc/device_ina228.hpp` + `device/src/device_ina228.cpp` | device 驱动，依赖 interface 对象 |
 | `protocol/modbus/src/modbus.cpp` | Modbus 协议栈，纯 C/C++ 无硬件依赖 |
 
 ---
@@ -393,7 +405,7 @@ python3 tests/test_modbus.py /dev/ttyACM0
 修改前必须读取：
 - 所有将被修改的文件
 - 所有依赖的接口头文件
-- 关联的 bsp / app / middleware 代码
+- 关联的 device / app / middleware 代码
 - `CHANGELOG.md`（了解变更历史）
 
 ### 15.3 先输出问题分析报告
@@ -463,7 +475,7 @@ python3 tests/test_modbus.py /dev/ttyACM0
 - 优化 usart_port 接收缓冲区逻辑
 
 ### Refactored
-- device_i2c_bus 锁机制改为 critical_spinlock
+- inter_i2c_bus 锁机制改为 critical_spinlock
 ```
 
 ### 15.10 过期日志清理规则

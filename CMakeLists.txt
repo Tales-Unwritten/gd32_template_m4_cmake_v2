@@ -121,34 +121,34 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     code/src/link.c
 
     # ── 硬件层（旧 C 驱动，逐步迁移中） ─────────────
-    Hardware/src/bsp_led.c
-    Hardware/src/eeprom.c
-    # Hardware/src/debug_uart.c  # 已迁移至 interface/usart_port
+    hardware/src/hard_bsp_led.c
+    hardware/src/hard_eeprom.c
+    # hardware/src/hard_debug_uart.c  # 已迁移至 interface/inter_usart
 
     # ── 接口抽象层（C++ 核心驱动） ───────────────────
-    interface/src/io_ctrl.cpp           # GPIO 引脚管理
-    interface/src/usart_port.cpp        # 串口通用驱动（含 ISR）
-    interface/src/spi_port.cpp          # SPI 主机驱动（阻塞全双工）
-    interface/src/timer_port.cpp        # 定时器驱动（基本定时 + PWM）
-    interface/src/can_port.cpp          # CAN 总线驱动（阻塞收发）
-    interface/src/i2c_hw_port.cpp       # 硬件 I2C 驱动（阻塞读写）
-    interface/src/adc_port.cpp          # ADC 驱动（阻塞单通道 + 扫描）
-    interface/src/dac_port.cpp          # DAC 驱动（双通道电压输出）
-    interface/src/dma_port.cpp          # DMA 通道驱动（M2M + 外设）
-    interface/src/exti_port.cpp         # 外部中断驱动
-    interface/src/wdt_port.cpp          # 看门狗驱动（IWDG + WWDG）
-    interface/src/rtc_port.cpp          # RTC 驱动（日历 + 闹钟）
-    interface/src/flash_port.cpp        # 内部 Flash 读写
-    interface/src/device_i2c_bus.cpp    # I2C 总线
-    interface/src/device_i2c_dev.cpp    # I2C 设备基类
+    interface/src/inter_io_ctrl.cpp           # GPIO 引脚管理
+    interface/src/inter_usart.cpp        # 串口通用驱动（含 ISR）
+    interface/src/inter_spi.cpp          # SPI 主机驱动（阻塞全双工）
+    interface/src/inter_timer.cpp        # 定时器驱动（基本定时 + PWM）
+    interface/src/inter_can.cpp          # CAN 总线驱动（阻塞收发）
+    interface/src/inter_i2c_hw.cpp       # 硬件 I2C 驱动（阻塞读写）
+    interface/src/inter_adc.cpp          # ADC 驱动（阻塞单通道 + 扫描）
+    interface/src/inter_dac.cpp          # DAC 驱动（双通道电压输出）
+    interface/src/inter_dma.cpp          # DMA 通道驱动（M2M + 外设）
+    interface/src/inter_exti.cpp         # 外部中断驱动
+    interface/src/inter_wdt.cpp          # 看门狗驱动（IWDG + WWDG）
+    interface/src/inter_rtc.cpp          # RTC 驱动（日历 + 闹钟）
+    interface/src/inter_flash.cpp        # 内部 Flash 读写
+    interface/src/inter_i2c_bus.cpp    # I2C 总线
+    interface/src/inter_i2c_dev.cpp    # I2C 设备基类
 
-    # ── BSP 设备驱动 ────────────────────────────────
-    bsp/src/ina226.cpp                  # INA226 电压/电流传感器
-    bsp/src/ina228.cpp                  # INA228 高精度传感器
-    bsp/src/debug_port.cpp              # Debug 串口 (USART0)
-    bsp/src/rs485_port.cpp              # RS485 串口 (USART1, DE=PG13)
-    bsp/src/rs232_port.cpp              # RS232 串口 (USART2)
-    bsp/src/w25q128.cpp               # W25Q128 Flash 全功能驱动
+    # ── device 设备驱动 ────────────────────────────────
+    device/src/device_ina226.cpp                  # INA226 电压/电流传感器
+    device/src/device_ina228.cpp                  # INA228 高精度传感器
+    device/src/device_debug.cpp              # Debug 串口 (USART0)
+    device/src/device_rs485.cpp              # RS485 串口 (USART1, DE=PG13)
+    device/src/device_rs232.cpp              # RS232 串口 (USART2)
+    device/src/device_w25q128.cpp               # W25Q128 Flash 全功能驱动
 
     # ── Modbus 协议栈 ───────────────────────────────
     protocol/modbus/src/modbus_crc.cpp         # CRC 校验
@@ -163,9 +163,9 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     protocol/hex/src/hex.cpp         # hex指令解析器
 
     # ── 应用协议层 ─────────────────────────────────
-    App/src/private.cpp                 # 波特率存储管理
-    App/src/protocol_conf.cpp                # 多协议调度 + Modbus 寄存器刷新
-    App/src/pc_task.cpp                 # 任务入口（薄调度）
+    app/src/private.cpp                 # 波特率存储管理
+    app/src/protocol_conf.cpp                # 多协议调度 + Modbus 寄存器刷新
+    app/src/pc_task.cpp                 # 任务入口（薄调度）
 
     # ── 用户应用 ───────────────────────────────────
     user/src/founction.cpp              # 主循环 / 初始化
@@ -186,14 +186,14 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
 
     # project
     code/inc
-    Hardware/inc
+    hardware/inc
     interface/inc
-    bsp/inc
+    device/inc
     user/inc
     protocol/modbus/inc
     protocol/string/inc
     protocol/hex/inc
-    App/inc
+    app/inc
 )
 
 # ============================================================

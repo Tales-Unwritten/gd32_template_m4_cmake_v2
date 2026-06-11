@@ -1,16 +1,16 @@
 #include "founction.hpp"
-#include "usart_port.hpp"
-#include "debug_port.hpp"
+#include "inter_usart.hpp"
+#include "device_debug.hpp"
 #include "protocol_conf.hpp"
 #include "pc_task.hpp"
-#include "device_i2c_bus.hpp"
-#include "device_i2c_dev.hpp"
-#include "ina228.hpp"
-#include "io_ctrl.hpp"
+#include "inter_i2c_bus.hpp"
+#include "inter_i2c_dev.hpp"
+#include "device_ina228.hpp"
+#include "inter_io_ctrl.hpp"
 #include "systick.h"
 
 /* ── 外设 ──────────────────────────────────────────── */
-device_i2c_bus i2c_bus({GPIOE, GPIOE, GPIO_PIN_2, GPIO_PIN_3}, 1);
+inter_i2c_bus i2c_bus({GPIOE, GPIOE, GPIO_PIN_2, GPIO_PIN_3}, 1);
 INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40);
 
 io_ctrl led1(GPIOC, GPIO_PIN_4);

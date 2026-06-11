@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-06-11 — 文件命名规范化重构
+
+### Refactored
+
+统一三个核心目录的文件命名风格，消除 `_port` / `_bsp` 等不一致后缀：
+
+| 目录 | 规则 | 示例 |
+|------|------|------|
+| `interface/` | 去掉 `_port` 后缀，加 `inter_` 前缀 | `adc_port.hpp` → `inter_adc.hpp` |
+| `bsp/` → `device/` | 去掉 `_port` 后缀，加 `device_` 前缀；目录重命名 | `debug_port.hpp` → `device_debug.hpp` |
+| `hardware/` | 去掉 `_bsp` 后缀（如有），加 `hard_` 前缀 | `adc_bsp.h` → `hard_adc.h` |
+
+涉及文件：
+- `interface/inc/` 16 个头文件
+- `interface/src/` 15 个源文件
+- `device/inc/` 7 个头文件
+- `device/src/` 7 个源文件
+- `hardware/inc/` 13 个头文件
+- `hardware/src/` 14 个源文件
+
+连带更新：
+- `CMakeLists.txt` 构建路径
+- `readme.md` 文档路径
+- `SKILL.md` 规范文档
+- `changelog.md` 历史记录
+- `app/`、`protocol/`、`user/` 中所有 `#include` 引用
+
 ## 2026-06-05 — 字符串协议重构（多端口 + 命令框架）
 
 ### 重构内容
@@ -26,7 +53,7 @@
 
 ### 关联修复
 
-- `App/inc/protocol_conf.hpp`：修复 `PROTOCOL_MODBUS` 重复定义（第32行和第33行），添加 `PROTOCOL_STRING_CMD=2`
+- `app/inc/protocol_conf.hpp`：修复 `PROTOCOL_MODBUS` 重复定义（第32行和第33行），添加 `PROTOCOL_STRING_CMD=2`
 
 ### usart_port 接口变更
 
@@ -51,8 +78,8 @@
 
 | 文件 | 调用处 |
 |------|--------|
-| `bsp/src/ina226.cpp` | 14 处 send_data 调用添加 `(void)` |
-| `bsp/src/ina228.cpp` | 28 处 send_data 调用添加 `(void)` |
+| `device/src/device_ina226.cpp` | 14 处 send_data 调用添加 `(void)` |
+| `device/src/device_ina228.cpp` | 28 处 send_data 调用添加 `(void)` |
 | `protocol/modbus/src/modbus.cpp` | 1 处 send_data_it 调用添加 `(void)` |
 | `protocol/string/src/string_pro.cpp` | 1 处 send_data 调用添加 `(void)` |
 | `user/src/founction.cpp` | 1 处 send_data 调用添加 `(void)` |
@@ -63,19 +90,19 @@
 
 ### link.h 解耦
 
-移除 `link.h` 中的 C++ 专用驱动层（`#include "usart_port.hpp"` 和 extern 声明），避免循环依赖。各 bsp 文件已自行包含 `usart_port.hpp`。
+移除 `link.h` 中的 C++ 专用驱动层（`#include "inter_usart.hpp"` 和 extern 声明），避免循环依赖。各 device 文件已自行包含 `inter_usart.hpp`。
 
 ### 安全性修复（3 项）
 
 | # | 严重度 | 位置 | 问题 | 修复 |
 |---|--------|------|------|------|
-| 1 | 🟡 | `device_i2c_bus.hpp:11` | 重复的 `#ifdef __cplusplus` | 移除重复的预处理指令 |
-| 2 | 🟡 | `timer_port.cpp:71` | `channel_count` 无边界检查，可能越界访问 `channels[4+]` | 添加 `count = min(channel_count, 4)` 限制 |
-| 3 | 🟡 | `usart_port.cpp:115` | 使用 `new[]` 堆分配缓冲区（历史遗留） | 添加 `[LEGACY]` 标记注释，新外设应使用 `usart_async_port` |
+| 1 | 🟡 | `inter_i2c_bus.hpp:11` | 重复的 `#ifdef __cplusplus` | 移除重复的预处理指令 |
+| 2 | 🟡 | `inter_timer.cpp:71` | `channel_count` 无边界检查，可能越界访问 `channels[4+]` | 添加 `count = min(channel_count, 4)` 限制 |
+| 3 | 🟡 | `inter_usart.cpp:115` | 使用 `new[]` 堆分配缓冲区（历史遗留） | 添加 `[LEGACY]` 标记注释，新外设应使用 `usart_async_port` |
 
 ### 已确认无需修复
 
-- `device_i2c_dev.cpp:101` — 已有空指针检查 `if (!Data || length == 0 || length > 8)`
+- `inter_inter_i2c_dev.cpp:101` — 已有空指针检查 `if (!Data || length == 0 || length > 8)`
 
 ---
 
@@ -108,11 +135,11 @@ modbus_t: [rx_buf*] [rx_len] [rx_flag] [tx_data*] [tx_len] [tx_idx] [tx_busy]
 
 | 文件 | 改动 |
 |------|------|
-| `modbus.hpp` | `pc_receive_buffer_t` → `uart_buffer_t`；`#include "debug.hpp"` → `"debug_port.hpp"` |
+| `modbus.hpp` | `pc_receive_buffer_t` → `uart_buffer_t`；`#include "debug.hpp"` → `"device_debug.hpp"` |
 | `modbus.cpp` | 端口表 `&pc_receive_buffer` → `debug_uart.buffer()`；`tx_buf` → `tx_buf_arr` |
-| `usart_port.cpp` | ISR 错误处理增加 `buf->rx_flag = 0`（配合 Bug 5 修复） |
-| `CMakeLists.txt` | 剔除 `usart_async_port.cpp`，启用 `usart_port.cpp`；注释 `modbus_port_cfg.cpp` |
-| `founction.cpp` | 头文件 `usart_async_port.hpp` → `usart_port.hpp` |
+| `inter_usart.cpp` | ISR 错误处理增加 `buf->rx_flag = 0`（配合 Bug 5 修复） |
+| `CMakeLists.txt` | 剔除 `usart_async_port.cpp`，启用 `inter_usart.cpp`；注释 `modbus_port_cfg.cpp` |
+| `founction.cpp` | 头文件 `usart_async_port.hpp` → `inter_usart.hpp` |
 | `protocol.hpp` | `ACTIVE_PROTOCOL` = `PROTOCOL_MODBUS` |
 
 ### 验证
@@ -130,14 +157,14 @@ modbus_t: [rx_buf*] [rx_len] [rx_flag] [tx_data*] [tx_len] [tx_idx] [tx_busy]
 修改:
   protocol/modbus/inc/modbus.hpp       — 类型桥接 + 布局重构
   protocol/modbus/src/modbus.cpp       — 安全加固 + 接口适配
-  interface/src/usart_port.cpp          — ISR bug 修复
-  App/inc/protocol.hpp                  — 协议宏修正
-  bsp/inc/debug_port.hpp                — 类型统一
-  bsp/src/debug_port.cpp                — 使用 usart_port
+  interface/src/inter_usart.cpp          — ISR bug 修复
+  app/inc/protocol.hpp                  — 协议宏修正
+  device/inc/device_debug.hpp                — 类型统一
+  device/src/device_debug.cpp                — 使用 inter_usart
   user/src/founction.cpp                — INA228 集成
   code/inc/link.h                       — 类型统一
   CMakeLists.txt                        — 清理构建目标
 
 新增:
-  CHANGELOG.md                          — 本文档
+  changelog.md                          — 本文档
 ```

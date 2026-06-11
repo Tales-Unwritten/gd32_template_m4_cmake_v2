@@ -3,7 +3,7 @@
  * @brief   多协议公共入口 —— 初始化 & 任务分发
  *
  * ╔══════════════════════════════════════════════════════════════╗
- * ║  切换协议: 修改 App/inc/protocol.hpp 中 ACTIVE_PROTOCOL 宏   ║
+ * ║  切换协议: 修改 app/inc/protocol_conf.hpp 中 ACTIVE_PROTOCOL 宏   ║
  * ║  新增协议: 在下方 "DISPATCH" 区添加一个 #elif 分支即可        ║
  * ║           其余文件（Protocol_Init/Task 接口）无需改动         ║
  * ╚══════════════════════════════════════════════════════════════╝
@@ -49,7 +49,7 @@
  * ──────────────────────────────────────────────────────────── */
 
 #else
-#  error "Unknown ACTIVE_PROTOCOL — add a dispatch entry in App/src/protocol.cpp"
+#  error "Unknown ACTIVE_PROTOCOL — add a dispatch entry in app/src/protocol_conf.cpp"
 #endif
 
 /* ══════════════════════════════════════════════════════════════

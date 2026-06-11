@@ -2,45 +2,45 @@
   {
     "label": "Build",
     "command": "cmake --build --preset debug",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
   },
   {
     "label": "Flash DAPLink",
     "command": "openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
     "shell": "system",
   },
   {
     "label": "Build + Flash DAPLink",
     "command": "sh -c 'cmake --build --preset debug && openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
   },
   {
     "label": "Flash JLink",
     "command": "openocd -f openocd/interface-jlink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
     "shell": "system",
   },
   {
     "label": "Build + Flash JLink",
     "command": "sh -c 'cmake --build --preset debug && openocd -f openocd/interface-jlink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
   },
   {
     "label": "Clean Build",
     "command": "sh -c 'rm -rf build && cmake --preset debug'",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
   },
   {
     "label": "OpenOCD Server",
     "command": "openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
     "use_new_terminal": true,
   },
   {
     "label": "GDB",
     "command": "arm-none-eabi-gdb build/debug/gd32f470_template.elf -ex \"target remote localhost:3333\" -ex \"monitor reset halt\" -ex \"load\" -ex \"break main\" -ex \"continue\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "/Users/apple/Documents/Project_GD32/gd32_-template_-m4_-cmake_v2",
     "use_new_terminal": true,
   },
 ]

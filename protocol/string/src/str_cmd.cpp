@@ -14,7 +14,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "ina228.hpp"
+#include "device_ina228.hpp"
 
 /* ============================================================
  *  用户命令处理函数 —— 在此处添加/删除

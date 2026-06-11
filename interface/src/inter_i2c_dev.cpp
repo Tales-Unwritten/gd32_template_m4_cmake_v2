@@ -1,0 +1,130 @@
+
+#include "inter_i2c_dev.hpp"
+
+inter_i2c_dev::inter_i2c_dev(inter_i2c_bus *bus, uint8_t addr)
+    : _bus(bus), _addr(addr)
+{
+}
+
+// ============================================================
+//  16 位寄存器读写
+// ============================================================
+
+void inter_i2c_dev::i2c_write_16bit(uint8_t RegAdd, uint16_t Data)
+{
+    _bus->i2c_lock();
+
+    _bus->i2c_start();
+    _bus->i2c_write_byte(_addr << 1);
+    if (_bus->i2c_wait_ack())
+    {
+        _bus->i2c_write_byte(RegAdd);
+        if (_bus->i2c_wait_ack())
+        {
+            _bus->i2c_write_byte((Data >> 8) & 0xFF);
+            _bus->i2c_wait_ack();
+            _bus->i2c_write_byte(Data & 0xFF);
+            _bus->i2c_wait_ack();
+        }
+    }
+    _bus->i2c_stop();
+    _bus->i2c_unlock();
+}
+
+uint16_t inter_i2c_dev::i2c_read_16bit(uint8_t RegAdd)
+{
+    uint16_t Data = 0;
+
+    _bus->i2c_lock();
+
+    _bus->i2c_start();
+    _bus->i2c_write_byte(_addr << 1);
+    if (_bus->i2c_wait_ack())
+    {
+        _bus->i2c_write_byte(RegAdd);
+        if (_bus->i2c_wait_ack())
+        {
+            _bus->i2c_start();
+            _bus->i2c_write_byte((_addr << 1) | 0x01);
+            if (_bus->i2c_wait_ack())
+            {
+                uint8_t msb = _bus->i2c_read_byte();
+                _bus->i2c_write_ack(0); // ACK
+
+                uint8_t lsb = _bus->i2c_read_byte();
+                _bus->i2c_write_ack(1); // NACK
+
+                Data = (msb << 8) | lsb;
+            }
+        }
+    }
+    _bus->i2c_stop();
+    _bus->i2c_unlock();
+    return Data;
+}
+
+// ============================================================
+//  自由长度写入（1~8 字节）
+// ============================================================
+
+void inter_i2c_dev::i2c_freedom_write(uint8_t RegAdd, uint64_t Data, uint8_t length)
+{
+    if (length == 0 || length > 8) return;
+
+    _bus->i2c_lock();
+
+    _bus->i2c_start();
+    _bus->i2c_write_byte(_addr << 1);
+    if (!_bus->i2c_wait_ack()) goto exit;
+
+    _bus->i2c_write_byte(RegAdd);
+    if (!_bus->i2c_wait_ack()) goto exit;
+
+    for (int8_t i = length - 1; i >= 0; i--)
+    {
+        uint8_t byte = (Data >> (8 * i)) & 0xFF;
+        _bus->i2c_write_byte(byte);
+        _bus->i2c_wait_ack();
+    }
+
+exit:
+    _bus->i2c_stop();
+    _bus->i2c_unlock();
+}
+
+// ============================================================
+//  自由长度读取（1~8 字节）
+// ============================================================
+
+bool inter_i2c_dev::i2c_freedom_read(uint8_t RegAdd, uint64_t *Data, uint8_t length)
+{
+    if (!Data || length == 0 || length > 8) return false;
+    *Data = 0;
+    bool success = false;
+
+    _bus->i2c_lock();
+
+    _bus->i2c_start();
+    _bus->i2c_write_byte(_addr << 1);
+    if (!_bus->i2c_wait_ack()) goto exit;
+
+    _bus->i2c_write_byte(RegAdd);
+    if (!_bus->i2c_wait_ack()) goto exit;
+
+    _bus->i2c_start();
+    _bus->i2c_write_byte((_addr << 1) | 0x01);
+    if (!_bus->i2c_wait_ack()) goto exit;
+
+    for (uint8_t i = 0; i < length; i++)
+    {
+        uint8_t rx = _bus->i2c_read_byte();
+        *Data = (*Data << 8) | rx;
+        _bus->i2c_write_ack((i == (length - 1)) ? 1 : 0);
+    }
+    success = true;
+
+exit:
+    _bus->i2c_stop();
+    _bus->i2c_unlock();
+    return success;
+}

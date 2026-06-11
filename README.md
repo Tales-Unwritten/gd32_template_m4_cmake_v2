@@ -4,8 +4,8 @@
 支持 **Modbus RTU**、**ASCII 字符串指令** 和 **HEX 指令** 三协议栈。
 
 > 开发板：MickeyPlus V2.0.0 (GD32F450ZGT6 / GD32F470ZIT6, 144-pin LQFP)
-> 引脚表：[docs/PINOUT.md](docs/PINOUT.md) | 开发规范：[.agents/skills/my-gd-skill/SKILL.md](.agents/skills/my-gd-skill/SKILL.md)
-> 变更日志：[docs/CHANGELOG.md](docs/CHANGELOG.md)
+> 引脚表：[docs/pinout.md](docs/pinout.md) | 开发规范：[.agents/skills/my-gd-skill/SKILL.md](.agents/skills/my-gd-skill/SKILL.md)
+> 变更日志：[docs/changelog.md](docs/changelog.md)
 
 ---
 
@@ -350,23 +350,23 @@ arm-none-eabi-gdb build/debug/gd32f470_template.elf
 
 | 类 | 头文件 | 功能 | 状态 |
 |----|--------|------|------|
-| `io_ctrl` | `interface/inc/io_ctrl.hpp` | GPIO 单引脚原子操作（RAII 生命周期） | ✅ 正式 |
-| `usart_port` | `interface/inc/usart_port.hpp` | USART 串口（阻塞/中断收发，含 ISR 内聚） | ✅ 正式 |
-| `spi_port` | `interface/inc/spi_port.hpp` | SPI 主机全双工（阻塞） | ✅ 正式 |
-| `timer_port` | `interface/inc/timer_port.hpp` | 基本定时 + PWM + 中断 | ✅ 正式 |
-| `device_i2c_bus` | `interface/inc/device_i2c_bus.hpp` | 软件 I2C 总线（GPIO 位反转） | ✅ 正式 |
-| `device_i2c_dev` | `interface/inc/device_i2c_dev.hpp` | I2C 设备基类 | ✅ 正式 |
-| `i2c_hw_port` | `interface/inc/i2c_hw_port.hpp` | 硬件 I2C 主机（阻塞读写） | ✅ 正式 |
-| `can_port` | `interface/inc/can_port.hpp` | CAN 总线收发（阻塞） | ✅ 正式 |
-| `adc_port` | `interface/inc/adc_port.hpp` | ADC 单通道 + 扫描模式 | ✅ 正式 |
-| `dac_port` | `interface/inc/dac_port.hpp` | DAC 双通道电压输出 | ✅ 正式 |
-| `dma_channel` | `interface/inc/dma_port.hpp` | DMA 通道（M2M / P2M / M2P） | ✅ 正式 |
-| `exti_port` | `interface/inc/exti_port.hpp` | 外部中断（EXTI 线管理） | ✅ 正式 |
-| `wdt_port` | `interface/inc/wdt_port.hpp` | 看门狗（IWDG + WWDG） | ✅ 正式 |
-| `rtc_port` | `interface/inc/rtc_port.hpp` | RTC 日历 + 闹钟 | ✅ 正式 |
-| `flash_port` | `interface/inc/flash_port.hpp` | 内部 Flash 读/写/擦除 | ✅ 正式 |
+| `io_ctrl` | `interface/inc/inter_io_ctrl.hpp` | GPIO 单引脚原子操作（RAII 生命周期） | ✅ 正式 |
+| `usart_port` | `interface/inc/inter_usart.hpp` | USART 串口（阻塞/中断收发，含 ISR 内聚） | ✅ 正式 |
+| `spi_port` | `interface/inc/inter_spi.hpp` | SPI 主机全双工（阻塞） | ✅ 正式 |
+| `timer_port` | `interface/inc/inter_timer.hpp` | 基本定时 + PWM + 中断 | ✅ 正式 |
+| `inter_i2c_bus` | `interface/inc/inter_i2c_bus.hpp` | 软件 I2C 总线（GPIO 位反转） | ✅ 正式 |
+| `inter_i2c_dev` | `interface/inc/inter_i2c_dev.hpp` | I2C 设备基类 | ✅ 正式 |
+| `i2c_hw_port` | `interface/inc/inter_i2c_hw.hpp` | 硬件 I2C 主机（阻塞读写） | ✅ 正式 |
+| `can_port` | `interface/inc/inter_can.hpp` | CAN 总线收发（阻塞） | ✅ 正式 |
+| `adc_port` | `interface/inc/inter_adc.hpp` | ADC 单通道 + 扫描模式 | ✅ 正式 |
+| `dac_port` | `interface/inc/inter_dac.hpp` | DAC 双通道电压输出 | ✅ 正式 |
+| `dma_channel` | `interface/inc/inter_dma.hpp` | DMA 通道（M2M / P2M / M2P） | ✅ 正式 |
+| `exti_port` | `interface/inc/inter_exti.hpp` | 外部中断（EXTI 线管理） | ✅ 正式 |
+| `wdt_port` | `interface/inc/inter_wdt.hpp` | 看门狗（IWDG + WWDG） | ✅ 正式 |
+| `rtc_port` | `interface/inc/inter_rtc.hpp` | RTC 日历 + 闹钟 | ✅ 正式 |
+| `flash_port` | `interface/inc/inter_flash.hpp` | 内部 Flash 读/写/擦除 | ✅ 正式 |
 
-> **使用原则**：所有 GD32 SDK 调用仅限 `interface/src/`，上层（bsp / app / user）**严禁**直接调用 `gd32f4xx_*.h` 函数。
+> **使用原则**：所有 GD32 SDK 调用仅限 `interface/src/`，上层（device / app / user）**严禁**直接调用 `gd32f4xx_*.h` 函数。
 
 ### 串口驱动体系
 
@@ -433,49 +433,49 @@ gd32_template_m4_cmake_v2/
 
 ├── interface/                     # 接口抽象层（C++，核心驱动）
 │   ├── src/                       # 15 个外设驱动实现
-│   │   ├── io_ctrl.cpp            # GPIO 引脚管理
-│   │   ├── usart_port.cpp         # 串口驱动（含 ISR 分发）
-│   │   ├── spi_port.cpp           # SPI 主机驱动
-│   │   ├── timer_port.cpp         # 定时器驱动
-│   │   ├── adc_port.cpp           # ADC 驱动
-│   │   ├── dac_port.cpp           # DAC 驱动
-│   │   ├── can_port.cpp           # CAN 驱动
-│   │   ├── i2c_hw_port.cpp        # 硬件 I2C 驱动
-│   │   ├── device_i2c_bus.cpp     # 软件 I2C 总线
-│   │   ├── device_i2c_dev.cpp     # I2C 设备基类
-│   │   ├── dma_port.cpp           # DMA 通道驱动
-│   │   ├── exti_port.cpp          # 外部中断驱动
-│   │   ├── wdt_port.cpp           # 看门狗驱动
-│   │   ├── rtc_port.cpp           # RTC 驱动
-│   │   └── flash_port.cpp         # 内部 Flash 驱动
+│   │   ├── inter_io_ctrl.cpp            # GPIO 引脚管理
+│   │   ├── inter_usart.cpp         # 串口驱动（含 ISR 分发）
+│   │   ├── inter_spi.cpp           # SPI 主机驱动
+│   │   ├── inter_timer.cpp         # 定时器驱动
+│   │   ├── inter_adc.cpp           # ADC 驱动
+│   │   ├── inter_dac.cpp           # DAC 驱动
+│   │   ├── inter_can.cpp           # CAN 驱动
+│   │   ├── inter_i2c_hw.cpp        # 硬件 I2C 驱动
+│   │   ├── inter_device_i2c_bus.cpp     # 软件 I2C 总线
+│   │   ├── inter_device_i2c_dev.cpp     # I2C 设备基类
+│   │   ├── inter_dma.cpp           # DMA 通道驱动
+│   │   ├── inter_exti.cpp          # 外部中断驱动
+│   │   ├── inter_wdt.cpp           # 看门狗驱动
+│   │   ├── inter_rtc.cpp           # RTC 驱动
+│   │   └── inter_flash.cpp         # 内部 Flash 驱动
 │   └── inc/                       # 对应 .hpp 头文件
 
-├── bsp/                          # 板级支持包（C++，设备驱动）
+├── device/                          # 板级支持包（C++，设备驱动）
 │   ├── src/
-│   │   ├── debug_port.cpp         # 调试串口 (USART0)
-│   │   ├── rs485_port.cpp         # RS485 串口 (USART1, DE=PG13)
-│   │   ├── rs232_port.cpp         # RS232 串口 (USART2)
-│   │   ├── ina228.cpp             # INA228 高精度传感器
-│   │   ├── ina226.cpp             # INA226 传感器
-│   │   └── w25q128.cpp            # W25Q128 SPI Flash 驱动
-│   │   └── w25q128_flash.cpp      # W25Q128 通用 Flash 操作
+│   │   ├── device_debug.cpp         # 调试串口 (USART0)
+│   │   ├── device_rs485.cpp         # RS485 串口 (USART1, DE=PG13)
+│   │   ├── device_rs232.cpp         # RS232 串口 (USART2)
+│   │   ├── device_ina228.cpp             # INA228 高精度传感器
+│   │   ├── device_ina226.cpp             # INA226 传感器
+│   │   └── device_w25q128.cpp            # W25Q128 SPI Flash 驱动
+│   │   └── device_w25q128_flash.cpp      # W25Q128 通用 Flash 操作
 │   └── inc/                       # 对应 .hpp 头文件
 
-├── Hardware/                     # 硬件驱动层（旧 C 驱动，逐步迁移中）
+├── hardware/                     # 硬件驱动层（旧 C 驱动，逐步迁移中）
 │   ├── src/
-│   │   ├── bsp_led.c             # LED 控制
+│   │   ├── hard_bsp_led.c             # LED 控制
 │   │   ├── key.c                 # 按键检测
 │   │   ├── dip_switch.c          # 拨码开关
-│   │   ├── eeprom.c              # AT24C02 EEPROM
+│   │   ├── hard_eeprom.c              # AT24C02 EEPROM
 │   │   ├── bmp280.c              # BMP280 气压传感器
 │   │   ├── soft_i2c.c            # 旧版软件 I2C
 │   │   ├── rs485.c               # 旧版 RS485
 │   │   ├── can.c                 # 旧版 CAN
-│   │   ├── debug_uart.c          # 旧版调试串口（已停用）
+│   │   ├── hard_debug_uart.c          # 旧版调试串口（已停用）
 │   │   ├── usart_text.c          # 旧版串口文本协议
 │   │   ├── w25q128.c             # 旧版 SPI Flash
-│   │   ├── adc_bsp.c             # 旧版 ADC
-│   │   ├── adc_test.c            # ADC 测试
+│   │   ├── hard_adc.c             # 旧版 ADC
+│   │   ├── hard_adc_test.c            # ADC 测试
 │   │   └── bitband.c             # Bit-band 操作
 │   └── inc/                      # 对应 .h 头文件
 
@@ -500,7 +500,7 @@ gd32_template_m4_cmake_v2/
 │       ├── inc/hex.hpp
 │       └── src/hex.cpp
 
-├── App/                          # 应用协议层
+├── app/                          # 应用协议层
 │   ├── inc/
 │   │   ├── protocol_conf.hpp     # 协议 ID 定义 + 公共接口
 │   │   ├── pc_task.hpp           # PC 通信任务
@@ -519,14 +519,14 @@ gd32_template_m4_cmake_v2/
 │   └── test_string.py            # 字符串指令协议测试
 
 ├── docs/                         # 文档
-│   ├── CHANGELOG.md              # 变更日志
-│   ├── PINOUT.md                 # 引脚表
-│   ├── DEBUG_LOG.md              # 调试日志
-│   ├── PROJECT_PLAN.md           # 项目规划
-│   ├── README.md                 # docs 索引
+│   ├── changelog.md              # 变更日志
+│   ├── pinout.md                 # 引脚表
+│   ├── debug_log.md              # 调试日志
+│   ├── project_plan.md           # 项目规划
+│   ├── readme.md                 # docs 索引
 │   └── tests/
-│       ├── TEST_REPORT.md        # Modbus 测试报告
-│       └── TEST_STRING_REPORT.md # 字符串协议测试报告
+│       ├── test_report.md        # Modbus 测试报告
+│       └── test_string_report.md # 字符串协议测试报告
 
 ├── file/                         # 数据手册 / 参考资料
 │   ├── GD32F470ZIT6_规格书.PDF
@@ -563,7 +563,7 @@ gd32_template_m4_cmake_v2/
 └──────────────┬──────────────────────┘
                │
 ┌──────────────▼──────────────────────┐
-│        App/protocol_conf            │  ← 多协议调度层
+│        app/protocol_conf            │  ← 多协议调度层
 │   ┌──────────┐  ┌──────────────┐   │
 │   │  Modbus  │  │ StringCmd    │   │
 │   └─────┬────┘  └──────┬───────┘   │
@@ -574,7 +574,7 @@ gd32_template_m4_cmake_v2/
 └─────────┬──────────────────────────┘
           │
 ┌─────────▼──────────────────────────┐
-│     interface / bsp / Hardware     │  ← 硬件抽象 & 设备驱动
+│     interface / device / hardware     │  ← 硬件抽象 & 设备驱动
 │  usart_port, i2c_bus, ina228, ...  │
 │  LED, EEPROM, KEY, CAN, ...        │
 └─────────┬──────────────────────────┘
@@ -609,7 +609,7 @@ USART ISR → uart_buffer_t.rx_flag = 1
 
 ## 八、协议配置与切换
 
-项目支持三种通信协议，通过 `App/inc/protocol_conf.hpp` 中的宏切换：
+项目支持三种通信协议，通过 `app/inc/protocol_conf.hpp` 中的宏切换：
 
 ```c
 // ── 协议选择（修改此宏后重新编译即可切换） ──
@@ -764,7 +764,7 @@ pacman -S mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
 - 源码文件（`.c/.h/.cpp/.hpp/.s/.S`）强制 LF 换行（见 [.gitattributes](.gitattributes)）
 - `build/`、`__pycache__/`、`compile_commands.json`、编译产物均被 [.gitignore](.gitignore) 忽略
 - IDE 配置文件（`.zed/`）提交至仓库，团队共享一致性配置
-- 提交前确保编译通过，遵循 `docs/CHANGELOG.md` 记录变更
+- 提交前确保编译通过，遵循 `docs/changelog.md` 记录变更
 
 ---
 

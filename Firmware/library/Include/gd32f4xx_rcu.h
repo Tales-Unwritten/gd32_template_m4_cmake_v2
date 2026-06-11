@@ -284,7 +284,7 @@ OF SUCH DAMAGE.
 
 /* RCU_AHB1SPEN */
 #define RCU_AHB1SPEN_PASPEN             BIT(0)                    /*!< GPIO port A clock enable when sleep mode */
-#define RCU_AHB1SPEN_PBSPEN             BIT(1)                    /*!< GPIO port B clock enable when sleep mode */
+#define RCU_AHB1SPEN_PdeviceEN             BIT(1)                    /*!< GPIO port B clock enable when sleep mode */
 #define RCU_AHB1SPEN_PCSPEN             BIT(2)                    /*!< GPIO port C clock enable when sleep mode */
 #define RCU_AHB1SPEN_PDSPEN             BIT(3)                    /*!< GPIO port D clock enable when sleep mode */
 #define RCU_AHB1SPEN_PESPEN             BIT(4)                    /*!< GPIO port E clock enable when sleep mode */

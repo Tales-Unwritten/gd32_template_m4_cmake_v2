@@ -3,8 +3,8 @@
 #include "link.h"
 
 #ifdef __cplusplus
-#include "usart_port.hpp"
-#include "debug_port.hpp"
+#include "inter_usart.hpp"
+#include "device_debug.hpp"
 #endif
 
 #ifdef __cplusplus

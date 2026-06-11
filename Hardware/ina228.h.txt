@@ -2,7 +2,7 @@
 
 #include "gd32f4xx.h"
 #include "systick.h"
-#include "../Hardware/inc/soft_i2c.h"
+#include "../hardware/inc/hard_soft_i2c.h"
 
 
 #define MAX_EXPECTED_CURRENT  40.0f   // 最大预期电流，单位：A
@@ -207,7 +207,7 @@ typedef enum
 // This bit indicates the health of the ENERGY register.
 // If the 40 bit ENERGY register has overflowed this bit is set to 1.
 // Clears when the ENERGY register is read. bit 11
-typedef enum 
+typedef enum
 {
 	Energy_Normal                                              = 0x00,    // Normal operation
 	Energy_Overflowed                                          = 0x01     // Energy register overflowed
@@ -217,7 +217,7 @@ typedef enum
 // This bit indicates the health of the CHARGE register.
 // If the 40 bit CHARGE register has overflowed this bit is set to 1
 // Clears when the CHARGE register is read. bit 10
-typedef enum 
+typedef enum
 {
 	Charge_Normal                                              = 0x00,    // Normal operation
 	Charge_Overflowed                                          = 0x01     // Charge register overflowed
@@ -244,7 +244,7 @@ typedef enum
 typedef enum
 {
 	Temp_Over_Normal                                           = 0x00,    // Normal operation
-	Temp_Over_Limit                                            = 0x01     // Temperature over-limit occurred	
+	Temp_Over_Limit                                            = 0x01     // Temperature over-limit occurred
 } INA228_Temperature_Over_Limit_enum;
 
 // This bit is set to 1 if the shunt voltage measurement exceeds the
@@ -360,7 +360,7 @@ typedef struct
 
 
 
-typedef struct  
+typedef struct
 {
 	void  (*CHG_INA228_Config)(uint32_t GPIOx, uint16_t SCL_Pin, uint16_t SDA_Pin, INA228_Addr_enum Addr);
 	uint16_t (*CHG_INA228_Get_Manufacturer_ID)(void);
@@ -369,7 +369,7 @@ typedef struct
     int32_t (*CHG_INA228_Get_Bus_Voltage)(void);
 	float (*CHG_INA228_Get_Temperature)(void);
 	void  (*CHG_INA228_Unlock_Alert)(void);
-	int32_t (*CHG_INA228_Get_Current)(void);    
+	int32_t (*CHG_INA228_Get_Current)(void);
 	float (*CHG_INA228_Get_Energy)(void);
 	float (*CHG_INA228_Get_Charge)(void);
 	float (*CHG_INA228_Get_Power)(void);

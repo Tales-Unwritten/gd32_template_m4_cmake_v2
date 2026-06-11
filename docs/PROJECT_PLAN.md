@@ -3,7 +3,7 @@
 > **分支策略**：`planB` 开发 → 验证通过 → 合并到 `master`
 >
 > 架构总览、外设状态表、编码规范 → 详见 [.agents/skills/my-gd-skill/SKILL.md](/.agents/skills/my-gd-skill/SKILL.md)
-> 变更历史 → 详见 [CHANGELOG.md](CHANGELOG.md)
+> 变更历史 → 详见 [changelog.md](changelog.md)
 
 ---
 
@@ -11,9 +11,9 @@
 
 | 问题 | 文件 | 严重度 | 计划 |
 |------|------|--------|------|
-| `usart_port` 使用 `new[]` 堆分配 | `interface/src/usart_port.cpp` | ~~中~~→ ✅ | Phase 1.1 已完成 |
-| `device_i2c_bus` 用 `while(_busy)` 自旋锁 | `interface/src/device_i2c_bus.cpp` | 低 | Phase 1.2 |
-| `Hardware/` 有 12 个旧 C 驱动未编译 | `Hardware/src/*.c` | 信息 | 逐步迁移或清理 |
+| `usart_port` 使用 `new[]` 堆分配 | `interface/src/inter_usart.cpp` | ~~中~~→ ✅ | Phase 1.1 已完成 |
+| `inter_i2c_bus` 用 `while(_busy)` 自旋锁 | `interface/src/inter_i2c_bus.cpp` | 低 | Phase 1.2 |
+| `hardware/` 有 12 个旧 C 驱动未编译 | `hardware/src/*.c` | 信息 | 逐步迁移或清理 |
 
 ---
 
@@ -23,8 +23,8 @@
 
 | 序号 | 功能 | 目标文件 | 说明 |
 |------|------|----------|------|
-| **1.1** | 重构 `usart_port` | `interface/usart_port.hpp/cpp` | ✅ 消除 `new[]`，模板静态 buffer |
-| **1.2** | 重构 `device_i2c_bus` 锁 | `interface/device_i2c_bus.hpp/cpp` | `while(_busy)` → `critical_spinlock` |
+| **1.1** | 重构 `usart_port` | `interface/inter_usart.hpp/cpp` | ✅ 消除 `new[]`，模板静态 buffer |
+| **1.2** | 重构 `inter_i2c_bus` 锁 | `interface/inter_i2c_bus.hpp/cpp` | `while(_busy)` → `critical_spinlock` |
 
 ### Phase 2：核心外设封装
 

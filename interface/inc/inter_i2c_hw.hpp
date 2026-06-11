@@ -1,0 +1,118 @@
+#pragma once
+// ============================================================
+// @platform GD32F4xx
+//   移植到新 MCU 时，本 .hpp 文件需替换：
+//     - [PORT] #include "gd32f4xx.h" → 目标 SDK 头文件
+//     - [PORT] enum class i2c_hw_id（按目标芯片调整枚举项）
+// ============================================================
+
+#ifdef __cplusplus
+
+#include <cstdint>
+#include "inter_io_ctrl.hpp"
+#include "gd32f4xx.h"       // [PORT] 替换为目标 SDK 头文件
+
+// ============================================================
+//  平台中性类型
+// ============================================================
+
+enum class i2c_hw_id : uint8_t { i2c0, i2c1, i2c2 };
+
+// ============================================================
+//  配置结构体（POD）
+// ============================================================
+
+struct I2cHwConfig {
+    i2c_hw_id periph;      ///< 外设 ID
+    uint32_t  scl_port;    ///< SCL GPIO 端口
+    uint32_t  scl_pin;     ///< SCL 引脚掩码
+    uint32_t  sda_port;    ///< SDA GPIO 端口
+    uint32_t  sda_pin;     ///< SDA 引脚掩码
+    uint32_t  af;          ///< 复用功能编号（I2C0/1/2 通常 AF4）
+    uint32_t  clock_speed; ///< 时钟速度: 100000 (标准) 或 400000 (快速)
+};
+
+// ============================================================
+//  硬件 I2C 总线（兼容 inter_i2c_bus 接口）
+// ============================================================
+
+/**
+ * @brief 硬件 I2C 总线端口
+ *
+ * 提供与 inter_i2c_bus 相同风格的总线级操作接口。
+ * inter_i2c_dev 可以通过组合此对象来使用硬件 I2C。
+ *
+ * 总线级使用示例：
+ *   i2c_hw_port bus({i2c_hw_id::i2c0, GPIOB, GPIO_PIN_6,
+ *                     GPIOB, GPIO_PIN_7, GPIO_AF_4, 400000});
+ *   bus.init();
+ *   bus.i2c_start();
+ *   bus.i2c_write_byte(0xA0);     // 设备地址 (写)
+ *   bus.i2c_wait_ack();
+ *   bus.i2c_write_byte(0x00);     // 寄存器地址
+ *   bus.i2c_wait_ack();
+ *   bus.i2c_start();              // 重复 START
+ *   bus.i2c_write_byte(0xA1);     // 设备地址 (读)
+ *   bus.i2c_wait_ack();
+ *   uint8_t data = bus.i2c_read_byte();
+ *   bus.i2c_write_ack(1);         // NACK
+ *   bus.i2c_stop();
+ *
+ * 设备级使用示例（封装推荐）：
+ *   bus.i2c_write_reg(0x50, 0x00, tx_data, 2);
+ *   bus.i2c_read_reg(0x50, 0x00, rx_data, 2);
+ */
+class i2c_hw_port {
+public:
+    explicit i2c_hw_port(const I2cHwConfig &cfg);
+    ~i2c_hw_port();
+
+    i2c_hw_port(const i2c_hw_port &) = delete;
+    i2c_hw_port &operator=(const i2c_hw_port &) = delete;
+
+    // ── 生命周期 ──────────────────────────────────────────
+    void init();
+    void deinit();
+    [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
+
+    // 总线控制（兼容 inter_i2c_bus 接口） ──────────────
+
+    void    i2c_start();        ///< 起始条件（等待总线空闲）
+    void    i2c_restart();      ///< 重复起始条件（不等待空闲，总线已占有）
+    void    i2c_stop();
+    void    i2c_write_byte(uint8_t data);
+    uint8_t i2c_read_byte();
+    bool    i2c_wait_ack(uint16_t timeout = 1000);
+    void    i2c_write_ack(uint8_t ack);    // 0=ACK, 1=NACK
+
+    // ── 互斥 ──────────────────────────────────────────────
+    void    i2c_lock();
+    void    i2c_unlock();
+    [[nodiscard]] uint8_t i2c_is_busy() const { return _busy; }
+
+    // ── 设备级便利方法（基于总线操作实现） ───────────────
+
+    /** @brief 写设备寄存器：START→ADDR(W)→REG→DATA...→STOP */
+    void i2c_write_reg(uint8_t dev_addr_7bit, uint8_t reg,
+                       const uint8_t *data, uint16_t len);
+
+    /** @brief 读设备寄存器：START→ADDR(W)→REG→RESTART→ADDR(R)→DATA...→STOP */
+    void i2c_read_reg(uint8_t dev_addr_7bit, uint8_t reg,
+                      uint8_t *data, uint16_t len);
+
+    // ── 查询 ──────────────────────────────────────────────
+    [[nodiscard]] i2c_hw_id periph() const noexcept { return _cfg.periph; }
+
+private:
+    void _enable_clock();
+    void _wait_flag(i2c_flag_enum flag);
+
+    I2cHwConfig    _cfg;
+    io_ctrl        _scl;
+    io_ctrl        _sda;
+    bool           _initialized;
+    uint32_t       _periph;
+    volatile uint8_t _busy;
+};
+
+#endif /* __cplusplus */

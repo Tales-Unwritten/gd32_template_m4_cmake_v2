@@ -1,0 +1,27 @@
+
+#pragma once
+
+#ifdef __cplusplus
+
+#include "inter_i2c_bus.hpp"
+
+#ifdef __cplusplus
+
+class inter_i2c_dev
+{
+public:
+    inter_i2c_dev(inter_i2c_bus *bus, uint8_t addr);
+
+    void     i2c_write_16bit(uint8_t RegAdd, uint16_t Data);
+    uint16_t i2c_read_16bit(uint8_t RegAdd);
+
+    void     i2c_freedom_write(uint8_t RegAdd, uint64_t Data, uint8_t length);
+    bool     i2c_freedom_read(uint8_t RegAdd, uint64_t *Data, uint8_t length);
+
+private:
+    inter_i2c_bus *_bus;
+    uint8_t _addr;
+};
+
+#endif /* __cplusplus */
+#endif /* __cplusplus */

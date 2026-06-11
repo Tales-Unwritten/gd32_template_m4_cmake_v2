@@ -1,5 +1,5 @@
 #pragma once
-#include "eeprom.h"
+#include "hard_eeprom.h"
 
 #ifdef __cplusplus
 extern "C" {

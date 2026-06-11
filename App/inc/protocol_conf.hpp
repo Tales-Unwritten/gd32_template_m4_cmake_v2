@@ -7,10 +7,10 @@
  * ║  新增协议三步走：                                            ║
  * ║  1. 在本文件 "协议 ID" 区追加:                               ║
  * ║       #define PROTOCOL_YOUR_NEW  N                          ║
- * ║  2. 创建 App/src/protocol_your_new.cpp，实现：               ║
+ * ║  2. 创建 app/src/protocol_your_new.cpp，实现：               ║
  * ║       void YourNew_Init(void);  void YourNew_Task(void);    ║
  * ║       （参考 protocol_string.cpp 的写法）                    ║
- * ║  3. 在 App/src/protocol.cpp 的 DISPATCH 段添加 #elif 分支    ║
+ * ║  3. 在 app/src/protocol.cpp 的 DISPATCH 段添加 #elif 分支    ║
  * ╚══════════════════════════════════════════════════════════════╝
  *
  * 协议实现文件:
