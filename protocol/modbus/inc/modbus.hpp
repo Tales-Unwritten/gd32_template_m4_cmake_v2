@@ -15,6 +15,12 @@
 #define MODBUS_RX_BUF_SIZE       256   /* 接收缓冲区字节数 */
 #define MODBUS_TX_BUF_SIZE       256   /* 发送缓冲区字节数 */
 #define MODBUS_MAX_REG_QUANTITY  125   /* 单次最大寄存器数量（Modbus 规范） */
+#define MODBUS_MAX_COIL_QUANTITY 2000  /* 单次最大线圈数量（Modbus 规范） */
+
+/* Modbus 异常码（Exception Code） */
+#define MODBUS_EXCEPTION_ILLEGAL_FUNCTION   0x01 /* 不支持的功能码 */
+#define MODBUS_EXCEPTION_ILLEGAL_DATA_ADDR  0x02 /* 数据地址越界 */
+#define MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE 0x03 /* 数据值非法 */
 
 /* 发送函数指针类型 */
 typedef void (*modbus_send_fn)(uint8_t *buf, uint16_t len);
@@ -68,5 +74,21 @@ void Modbus_FillData(uart_buffer_t *buf, modbus_send_fn send_fn);
 void Modbus_FrameProcess(void);
 
 void Modbus_PortSend(uint8_t *buf, uint16_t len);
+
+/*
+ * Modbus_ExceptionResponse —— 发送异常响应帧
+ *
+ * 帧格式: [从机地址][功能码|0x80][异常码][CRC_L][CRC_H]
+ *
+ * 参数:
+ *   func           —— 原始功能码（如 0x01）
+ *   exception_code —— 异常码（0x01/0x02/0x03）
+ *
+ * 异常码定义:
+ *   0x01 ILLEGAL FUNCTION   —— 不支持的功能码
+ *   0x02 ILLEGAL DATA ADDR  —— 数据地址越界
+ *   0x03 ILLEGAL DATA VALUE —— 数据值非法（如线圈数量为 0 或超限）
+ */
+void Modbus_ExceptionResponse(uint8_t func, uint8_t exception_code);
 
 #endif
