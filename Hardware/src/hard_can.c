@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_can.h"
+#include "hard_can.h"
 
 FlagStatus receive_flag = RESET;              // CAN接收标志位，用于指示是否有新的CAN消息接收
 uint8_t transmit_number = 0x0;                // CAN发送计数器，用于跟踪发送的消息数量
@@ -44,15 +44,15 @@ static void can_networking_init(void)
     can_parameter.resync_jump_width = CAN_BT_SJW_1TQ;  // 同步跳跃宽度1TQ
     can_parameter.time_segment_1 = CAN_BT_BS1_7TQ;     // 时间段1为7TQ
     can_parameter.time_segment_2 = CAN_BT_BS2_2TQ;     // 时间段2为2TQ
-    
+
     // 1Mbps波特率配置 (240MHz系统时钟)
     can_parameter.prescaler = 5;  // 预分频器24
-    
+
     /*
     // 500Kbps波特率配置 (如果需要)
     can_parameter.prescaler = 48;  // 预分频器48
     */
-    
+
 
     // 过滤器配置
 #ifdef DEV_CAN0_USED
@@ -60,7 +60,7 @@ static void can_networking_init(void)
 #else
     can_filter.filter_number = 15;
 #endif
-    
+
     can_filter.filter_mode = CAN_FILTERMODE_MASK;
     can_filter.filter_bits = CAN_FILTERBITS_32BIT;
     can_filter.filter_list_high = 0x0000;
@@ -123,7 +123,7 @@ static void nvic_config(void)
 //     uint8_t mailbox = can_message_transmit(CANX, &transmit_message);
 
 //     // 可选：检查发送状态
-    
+
 //     uint32_t timeout = 0xFFFF;
 //     while((can_transmit_states(CANX, mailbox) != CAN_TRANSMIT_OK) && (timeout != 0)) {
 //         timeout--;
@@ -131,7 +131,7 @@ static void nvic_config(void)
 //     if(timeout == 0) {
 //         printf( "CAN transmit timeout!\n");
 //     }
-    
+
 // }
 
 void can_transmit_data(uint8_t *data, uint8_t len)
@@ -147,7 +147,7 @@ void can_transmit_data(uint8_t *data, uint8_t len)
         can_flag_clear(CANX, CAN_FLAG_BOERR);  // 尝试清除
         return;
     }
-    
+
     if (can_flag_get(CANX, CAN_FLAG_PERR) == SET) {
         printf("CAN Passive Error!\n");
         return;
@@ -172,39 +172,39 @@ void can_transmit_data(uint8_t *data, uint8_t len)
 
     // 尝试发送
     uint8_t mailbox = can_message_transmit(CANX, &transmit_message);
-    
+
     printf("can_message_transmit returned mailbox: %d\n", mailbox);
-    
+
     if (mailbox == CAN_NOMAILBOX) {
         printf("No mailbox available!\n");
-        
+
         // 检查CAN控制器是否使能
         if (can_flag_get(CANX, CAN_FLAG_IWS) != SET) {
             printf("CAN controller not initialized properly!\n");
         }
-        
+
         // 强制检查邮箱状态
         FlagStatus tx_empty0 = can_flag_get(CANX, CAN_FLAG_TME0);
         FlagStatus tx_empty1 = can_flag_get(CANX, CAN_FLAG_TME1);
         FlagStatus tx_empty2 = can_flag_get(CANX, CAN_FLAG_TME2);
-        
-        printf("TX Mailbox Empty Flags - 0:%d, 1:%d, 2:%d\r\n", 
+
+        printf("TX Mailbox Empty Flags - 0:%d, 1:%d, 2:%d\r\n",
                tx_empty0, tx_empty1, tx_empty2);
-        
+
         return;
     }
 
     printf("Using mailbox %d for transmission\r\n", mailbox);
-    
+
     // 等待发送完成
     uint32_t timeout = 0xFFFF;
     can_transmit_state_enum state;
-    
+
     do {
         state = can_transmit_states(CANX, mailbox);
         timeout--;
     } while ((state == CAN_TRANSMIT_PENDING) && (timeout != 0));
-    
+
     if (state == CAN_TRANSMIT_OK) {
         printf("CAN transmit success!\n");
     } else if (state == CAN_TRANSMIT_FAILED) {
@@ -238,7 +238,7 @@ static void CANx_RX_IRQHandler(void)
         can_interrupt_flag_clear(CANX, CAN_INT_FLAG_RFL1);
         receive_flag = SET;
     }
-    
+
     // 可选：添加其他中断标志检查
     if (can_interrupt_flag_get(CANX, CAN_INT_FLAG_BOERR) == SET) {
         can_interrupt_flag_clear(CANX, CAN_INT_FLAG_BOERR);

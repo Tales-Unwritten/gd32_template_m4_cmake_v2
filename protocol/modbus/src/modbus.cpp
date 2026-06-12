@@ -20,18 +20,18 @@
 /**
  * Modbus RTU 功能码一览：
  *
- * 01  Read Coil                        // 读取线圈状态                [已实现]
- * 02  Read Discrete Input              // 读取离散输入状态            [已实现]
- * 03  Read Holding Register            // 读取保持寄存器            [已实现]
- * 04  Read Input Register              // 读取输入寄存器            [已实现]
- * 05  Write Single Coil                // 写单个线圈                [已实现]
- * 06  Write Single Register            // 写单个寄存器              [已实现]
+ * 01  Read Coil                        // 读取线圈状态-
+ * 02  Read Discrete Input              // 读取离散输入状态-
+ * 03  Read Holding Register            // 读取保持寄存器-
+ * 04  Read Input Register              // 读取输入寄存器-
+ * 05  Write Single Coil                // 写单个线圈-
+ * 06  Write Single Register            // 写单个寄存器-
  * 07  Read Exception Status            // 读取异常状态
  * 08  Diagnostics                      // 诊断
  * 0B  Get Comm Event Counter           // 获取通信事件计数器
  * 0C  Get Comm Event Log               // 获取通信事件日志
- * 0F  Write Multiple Coils             // 写多个线圈                [已实现]
- * 10  Write Multiple Registers         // 写多个寄存器              [已实现]
+ * 0F  Write Multiple Coils             // 写多个线圈-
+ * 10  Write Multiple Registers         // 写多个寄存器-
  * 11  Report Slave ID                  // 报告从机标识
  * 14  Read File Record                 // 读取文件记录
  * 15  Write File Record                // 写入文件记录
@@ -76,6 +76,7 @@ void Modbus_Init(void)
     memset(&Modbus, 0, sizeof(Modbus)); // 初始化 Modbus 结构体，将其所有成员清零
     Modbus.rx_buf  = Modbus.rx_buf_arr; // rx_buf 指针指向实际存储数组
     Modbus.tx_data = Modbus.tx_buf_arr; // tx_data 指针指向实际存储数组
+    Modbus.send    = NULL;              // 【安全】显式初始化发送函数指针
 }
 
 void Modbus_PortSend(uint8_t *buf, uint16_t len)
@@ -94,10 +95,15 @@ void Modbus_FillData(uart_buffer_t *buf, modbus_send_fn send_fn)
         return;
     }
 
-    Modbus.rx_len = buf->rx_len;
-    if(Modbus.rx_len > MODBUS_RX_BUF_SIZE)
-        Modbus.rx_len = MODBUS_RX_BUF_SIZE;
+    /* 【安全】丢弃超长帧，Modbus RTU ADU 最大 256 字节 */
+    if(buf->rx_len > MODBUS_RX_BUF_SIZE)
+    {
+        buf->rx_len  = 0;
+        buf->rx_flag = 0;
+        return;
+    }
 
+    Modbus.rx_len = buf->rx_len;
     memcpy(Modbus.rx_buf_arr, buf->rx_buf, Modbus.rx_len);
 
     Modbus.send = send_fn;   // 记住从哪个口来的，回哪个口
@@ -421,7 +427,10 @@ static void Modbus_Function01(void)
 
     /* 【安全】帧长校验: 地址(1)+功能码(1)+起始(2)+数量(2)+CRC(2) = 8 */
     if (Modbus.rx_len < 8)
+    {
+        Modbus_ExceptionResponse(0x01, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
         return;
+    }
 
     start    = (Modbus.rx_buf[2] << 8) | Modbus.rx_buf[3];
     quantity = (Modbus.rx_buf[4] << 8) | Modbus.rx_buf[5];
@@ -475,9 +484,12 @@ static void Modbus_Function02(void)
     uint16_t start;
     uint16_t quantity;
 
-    /* 【安全】帧长校验 */
+    /* 【安全】帧长校验: 地址(1)+功能码(1)+起始(2)+数量(2)+CRC(2) = 8 */
     if (Modbus.rx_len < 8)
+    {
+        Modbus_ExceptionResponse(0x02, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
         return;
+    }
 
     start    = (Modbus.rx_buf[2] << 8) | Modbus.rx_buf[3];
     quantity = (Modbus.rx_buf[4] << 8) | Modbus.rx_buf[5];
@@ -534,7 +546,10 @@ static void Modbus_Function05(void)
 
     /* 【安全】帧长校验: 地址(1)+功能码(1)+线圈地址(2)+值(2)+CRC(2) = 8 */
     if (Modbus.rx_len < 8)
+    {
+        Modbus_ExceptionResponse(0x05, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
         return;
+    }
 
     addr  = (Modbus.rx_buf[2] << 8) | Modbus.rx_buf[3];
     value = (Modbus.rx_buf[4] << 8) | Modbus.rx_buf[5];
@@ -580,7 +595,10 @@ static void Modbus_Function15(void)
 
     /* 【安全】帧长校验: 地址(1)+功能码(1)+起始(2)+数量(2)+字节数(1)+CRC(2) = 9 */
     if (Modbus.rx_len < 9)
+    {
+        Modbus_ExceptionResponse(0x0F, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE);
         return;
+    }
 
     start     = (Modbus.rx_buf[2] << 8) | Modbus.rx_buf[3];
     quantity  = (Modbus.rx_buf[4] << 8) | Modbus.rx_buf[5];

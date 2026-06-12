@@ -15,8 +15,8 @@
 
 #include "gd32f4xx.h"
 #include "gd32f4xx_adc.h"
-#include "../hardware/inc/hard_gpio.h"
-#include "../hardware/inc/hard_dma.h"
+#include "hard_gpio.h"
+#include "hard_dma.h"
 
 /* STM32F429IGT6 ADC通道对应的GPIO
     ADC通道       ADC1           ADC2       ADC3

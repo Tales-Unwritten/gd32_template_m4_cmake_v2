@@ -3,7 +3,7 @@
 #include "systick.h"
 #include "stdio.h"
 #include "string.h"
-#include "../hardware/inc/hard_soft_i2c.h"
+#include "hard_soft_i2c.h"
 
 #define BMP280_ADDRESS 0x76
 

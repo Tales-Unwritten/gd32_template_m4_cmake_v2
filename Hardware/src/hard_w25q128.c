@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_w25q128.h"
+#include "hard_w25q128.h"
 
 
 

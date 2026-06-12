@@ -1,5 +1,5 @@
 /* bitband.c */
-#include "../hardware/inc/hard_bitband.h"
+#include "hard_bitband.h"
 
 
 

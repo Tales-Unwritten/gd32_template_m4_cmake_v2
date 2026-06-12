@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-06-12 — Modbus 协议栈安全性修复
+
+### Fixed
+
+修复 Modbus RTU 协议栈的安全性和合规性问题：
+
+| # | 严重度 | 问题 | 修复 |
+|---|--------|------|------|
+| 1 | 🔴 | 功能码 0x01/0x02/0x05/0x0F 帧长校验失败时不返回异常响应，导致主机超时 | 统一添加异常响应，符合 Modbus 规范 |
+| 2 | 🟡 | `Modbus_FillData()` 接收超长帧时截断处理，可能导致数据解析错误 | 改为丢弃超长帧，Modbus RTU ADU 最大 256 字节 |
+| 3 | 🟡 | `Modbus_Init()` 未显式初始化 `send` 函数指针 | 添加 `Modbus.send = NULL` 显式初始化 |
+| 4 | 🔴 | `device_debug.cpp` 波特率配置为 460800，与文档 115200 不一致 | 修正为 115200，与 `readme.md` 和测试脚本一致 |
+
+### 涉及文件
+
+- `protocol/modbus/src/modbus.cpp` — 异常响应 + 超长帧丢弃 + send 指针初始化
+- `device/src/device_debug.cpp` — 波特率修正
+
+### 验证
+
+- 编译通过 ✅
+- 资源占用：FLASH 17.7KB/2MB (0.84%)，RAM 5.8KB/704KB (0.81%)
+
+---
+
 ## 2026-06-11 — 文件命名规范化重构
 
 ### Refactored

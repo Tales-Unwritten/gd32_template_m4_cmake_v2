@@ -1,8 +1,8 @@
 #pragma once
 #include "gd32f4xx.h"
 #include "systick.h"
-#include "../hardware/inc/hard_bsp_led.h"
-#include "../hardware/inc/hard_debug_uart.h"
+#include "hard_bsp_led.h"
+#include "hard_debug_uart.h"
 
 
 // //单击 双击 长按 时间定义

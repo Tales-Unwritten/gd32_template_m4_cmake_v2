@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_dip_switch.h"
+#include "../Hardware/inc/dip_switch.h"
 
 #if (DIP_SWITCH_4_8BIT)
 #define bit_num 8

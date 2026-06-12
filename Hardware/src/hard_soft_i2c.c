@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_soft_i2c.h"
+#include "hard_soft_i2c.h"
 
 
 

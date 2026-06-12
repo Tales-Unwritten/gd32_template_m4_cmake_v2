@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_rs485.h"
+#include "hard_rs485.h"
 
 
 uint32_t RS485_USART_BAUDRATE = RS485_BAUDRATE;

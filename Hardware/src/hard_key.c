@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_key.h"
+#include "hard_key.h"
 
  /**
   * @brief       基本定时器TIMER6定时中断初始化

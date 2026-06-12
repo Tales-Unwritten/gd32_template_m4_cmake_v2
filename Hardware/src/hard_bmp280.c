@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_bmp280.h"
+#include "hard_bmp280.h"
 
 I2C_Info BMP280_i2C;
 

@@ -1,4 +1,4 @@
-#include "../hardware/inc/hard_usart_text.h"
+#include "hard_usart_text.h"
 
 PC_Receive_Buffer_t USARTx_Receive_Buffer[CHCHE_COUNT];
 
