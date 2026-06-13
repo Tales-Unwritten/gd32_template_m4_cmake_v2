@@ -1,5 +1,68 @@
 # Changelog
 
+## 2026-06-13 — AT24Cxx 统一 EEPROM 驱动框架
+
+### Added
+
+实现 AT24Cxx 全系列 EEPROM 统一 C++ 驱动（`device_eeprom`），替代旧 C 驱动 `hard_eeprom`：
+
+**覆盖型号**：24C02 / 24C04 / 24C08 / 24C16 / 24C32 / 24C64
+
+**三层 API**：
+
+| 层级 | 功能 | 典型 API |
+|------|------|----------|
+| L1 协议层 | 随机读写、字节操作、填充、ACK 探测、总线恢复 | `read()` / `write()` / `probe()` |
+| L2 便利层 | 全片 dump、写入回读校验、空片检查、连续读取、WP 引脚 | `dump()` / `write_verified()` / `is_blank()` / `wp_enable()` |
+| L3 结构化层 | 带 magic + version + CRC16 的配置块存取（模板） | `read_config<T>()` / `write_config<T>()` |
+
+**架构要点**：
+
+- 直接依赖 `inter_i2c_bus`（不依赖 `inter_i2c_dev`），因为 EEPROM 是"内存地址+数据"协议
+- 24C04/08/16 的页寻址（页位嵌入 I2C 器件地址）自动处理
+- 24C32/64 的双字节内存地址自动处理
+- 跨页写入自动切分
+- ACK 轮询替代固定延时（更快更可靠）
+- 零堆分配，所有缓冲区栈上或调用方提供
+- CRC-16-CCITT (0x1021) 用于配置块校验
+- `detect_model()` 非破坏性自动型号检测
+
+**数据安全性**：
+
+- `_begin_write` / `_begin_read` 每个 ACK 超时均有返回检查
+- `_wait_write_cycle` ACK 轮询 + 可配置超时
+- `write_verified` 写入后逐字节回读比对
+- `read_config` / `write_config` 含 magic(0xA5E5) + CRC16 双重校验
+- I2C 通信失败自动调用 `i2c_bus_recovery()` 恢复总线
+- WP 引脚支持：默认高电平写保护，写入时拉低
+
+**设计决策**：
+
+| # | 决策 | 理由 |
+|---|------|------|
+| 1 | 直接依赖 `inter_i2c_bus` | EEPROM 协议是"内存地址+数据"非"寄存器+数据" |
+| 2 | `read_config` 开销 7 字节/块 | magic(2)+version(1)+len(2)+CRC16(2)，嵌入式开销可接受 |
+| 3 | 构造时调用 `init()` | 对齐 INA226 模式，简化使用 |
+| 4 | 页寻址型号：_begin_write 拼接 I2C 地址 | 最内层完成协议适配，上层 API 透明 |
+| 5 | `detect_model` 非破坏性 | 保存+恢复地址 0 的原数据 |
+
+### 涉及文件
+
+- `device/inc/device_eeprom.hpp` — 重写：型号枚举、配置结构体、类声明、L3 模板
+- `device/src/device_eeprom.cpp` — 重写：约 560 行完整实现
+
+### 兼容性
+
+- 旧 C 驱动 `hardware/src/hard_eeprom.c` / `hardware/inc/hard_eeprom.h` 不变，两套可共存
+- `app/inc/private.hpp` 仍引用旧 `hard_eeprom.h`，不影响
+
+### 验证
+
+- 编译通过 ✅ 零错误零警告
+- 资源占用：FLASH 20768B/2MB (0.99%), RAM 6272B/704KB (0.87%)
+
+---
+
 ## 2026-06-12 — Modbus 协议栈安全性修复
 
 ### Fixed
