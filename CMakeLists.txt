@@ -26,6 +26,15 @@ project(gd32f470_template
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# 在项目根目录创建 compile_commands.json 符号链接，
+# 供 clangd / clang-tidy 等工具进行代码导航和诊断
+set(_cc_json "${CMAKE_SOURCE_DIR}/compile_commands.json")
+if(EXISTS "${_cc_json}")
+    file(REMOVE "${_cc_json}")
+endif()
+file(CREATE_LINK "${CMAKE_BINARY_DIR}/compile_commands.json"
+                 "${_cc_json}" SYMBOLIC)
+
 # ============================================================
 # Build Type
 # ============================================================
