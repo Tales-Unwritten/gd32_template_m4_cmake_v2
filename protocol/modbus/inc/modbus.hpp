@@ -4,7 +4,7 @@
 
 #include "modbus_crc.hpp"
 #include "modbus_map.hpp"
-#include "device_debug.hpp"
+#include "device_serial.hpp"
 
 #include <stdint.h>
 

@@ -11,7 +11,7 @@ uint8_t ee_Write_Byte(uint16_t addr, uint8_t data)
 {
 	Soft_I2C_WriteReg(&eepron_info, addr, data);
 	delay_ms(2); // 等待写入完成，通常EEPROM需要一些时间来完成写操作
-	// Soft_I2C_Start(&eepron_info);
+	// Soft_start(&eepron_info);
 	return Soft_I2C_ReceiveAck(&eepron_info); // 返回ACK位，0表示写入成功，1表示写入失败
 }
 
@@ -142,9 +142,9 @@ void ee_erase_All(void)
 uint8_t ee_Check_Device(void)
 {
 	uint8_t ack = 0;
-	Soft_I2C_Start(&eepron_info);
+	Soft_start(&eepron_info);
 	Soft_I2C_WriteByte(&eepron_info, (eepron_info.I2C_Add << 1) | 0); // 发送设备地址和写位
 	ack = Soft_I2C_ReceiveAck(&eepron_info);
-	Soft_I2C_Stop(&eepron_info);
+	Soft_stop(&eepron_info);
 	return ack; // 返回ACK位
 }

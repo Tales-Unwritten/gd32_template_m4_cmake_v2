@@ -207,7 +207,7 @@ class usart_async_port {
 
 - 基于 GPIO 位反转（io_ctrl 管理 SCL/SDA 引脚）
 - 开漏输出 + 内部上拉
-- `i2c_wait_ack()` 带有超时机制（1000 次循环）
+- `wait_ack()` 带有超时机制（1000 次循环）
 - 互斥锁 `_busy` 标志位
 
 ### 硬件 I2C（i2c_hw_port，规划中）

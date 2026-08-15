@@ -25,33 +25,35 @@ public:
     inter_i2c_bus(const inter_i2c_bus &) = delete;
     inter_i2c_bus &operator=(const inter_i2c_bus &) = delete;
 
-    void i2c_init();
+    void init();
 
     // 总线控制:
-    void i2c_start();
-    void i2c_stop();
+    void start();
+    void stop();
 
-    void i2c_write_byte(uint8_t ByteValue);
-    uint8_t i2c_read_byte();
+    uint8_t scan(uint8_t *found,uint8_t max_count, uint8_t start_addr,uint8_t end_addr);
 
-    uint8_t i2c_wait_ack(uint16_t timeout = 1000);
-    void i2c_write_ack(uint8_t AckValue);
+    void write_byte(uint8_t ByteValue);
+    uint8_t read_byte();
+
+    uint8_t wait_ack(uint16_t timeout = 1000);
+    void write_ack(uint8_t AckValue);
 
     // 互斥控制
-    void i2c_lock();
-    void i2c_unlock();
-    uint8_t i2c_is_busy();
+    void lock();
+    void unlock();
+    uint8_t is_busy();
 
     // 总线恢复
-    void i2c_bus_recovery();
+    void bus_recovery();
 
-    void i2c_delay();
-    void i2c_deinit();
+    void _delay();
+    void deinit();
 
 private:
-    void i2c_w_scl(uint8_t BitValue);
-    void i2c_w_sda(uint8_t BitValue);
-    FlagStatus i2c_r_sda();
+    void _write_scl(uint8_t BitValue);
+    void _write_sda(uint8_t BitValue);
+    FlagStatus _read_sda();
 
 private:
     io_ctrl _scl;          // SCL 引脚对象

@@ -54,7 +54,7 @@ void Ina228_WriteRegister(I2C_Info *i2c, INA228_Addr_enum Device_Add,
 {
     uint8_t len = INA228_RegLen(RegAdd);
 
-    Soft_I2C_Start(i2c);
+    Soft_start(i2c);
     Soft_I2C_WriteByte(i2c, Device_Add << 1);    // Write mode
     Soft_I2C_ReceiveAck(i2c);
 
@@ -70,7 +70,7 @@ void Ina228_WriteRegister(I2C_Info *i2c, INA228_Addr_enum Device_Add,
         Soft_I2C_ReceiveAck(i2c);
     }
 
-    Soft_I2C_Stop(i2c);
+    Soft_stop(i2c);
 }
 
 
@@ -80,14 +80,14 @@ uint64_t Ina228_ReadRegister(I2C_Info *i2c, INA228_Addr_enum Device_Add, uint16_
     uint8_t len = INA228_RegLen(RegAddress);
 
     //----------------- 写寄存器地址 -----------------
-    Soft_I2C_Start(i2c);
+    Soft_start(i2c);
     Soft_I2C_WriteByte(i2c, Device_Add << 1);
     Soft_I2C_ReceiveAck(i2c);
     Soft_I2C_WriteByte(i2c, RegAddress);
     Soft_I2C_ReceiveAck(i2c);
 
     //----------------- 读取数据 -----------------
-    Soft_I2C_Start(i2c);
+    Soft_start(i2c);
     Soft_I2C_WriteByte(i2c, (Device_Add << 1) | 0x01);
     Soft_I2C_ReceiveAck(i2c);
 
@@ -103,7 +103,7 @@ uint64_t Ina228_ReadRegister(I2C_Info *i2c, INA228_Addr_enum Device_Add, uint16_
         Soft_I2C_WriteAck(i2c, (i == (len - 1)) ? 1 : 0);
     }
 
-    Soft_I2C_Stop(i2c);
+    Soft_stop(i2c);
 
     return Data;
 }

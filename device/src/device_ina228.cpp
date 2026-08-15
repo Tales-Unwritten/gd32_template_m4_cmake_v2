@@ -1,8 +1,5 @@
 #include "device_ina228.hpp"
-#include "link.h"
-#include "inter_usart.hpp"
-
-extern usart_port debug_uart;
+#include "device_serial.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -14,20 +11,84 @@ extern usart_port debug_uart;
 INA228::INA228(inter_i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _alertPin(nullptr)
+    , _currentLSB_nA(0)
 {
-    _currentLSB_uA = _cfg.maxCurrent_mA * 1000 >> 19;
+    _updateCurrentLSB();
 }
 
 INA228::INA228(inter_i2c_bus* bus, uint8_t addr, const Config& cfg)
     : _dev(bus, addr)
     , _cfg(cfg)
     , _alertPin(nullptr)
+    , _currentLSB_nA(0)
 {
-    _currentLSB_uA = _cfg.maxCurrent_mA * 1000 >> 19;
+    _updateCurrentLSB();
 }
 
 INA228::~INA228()
 {
+}
+
+// ============================================================
+//  Current LSB（nA 精度，消除整数截断误差）
+//  Current_LSB = I_MAX / 2^19
+//  currentLSB_nA = maxCurrent_mA × 1e6 / 524288
+// ============================================================
+
+void INA228::_updateCurrentLSB()
+{
+    _currentLSB_nA =
+        (static_cast<int64_t>(_cfg.maxCurrent_mA) * 1000000) / 524288;
+}
+
+// ============================================================
+//  校准（对齐 GitHub 版 setMaxCurrentShunt）
+//
+//  SHUNT_CAL = 13107.2e6 × Current_LSB(A) × R_shunt(Ω)
+//            = maxCurrent_mA × r_shunt_uOhm / 40000
+//  ADCRANGE = 1（40.96 mV 档）时 ×4
+// ============================================================
+
+int INA228::setMaxCurrentShunt(int32_t maxCurrent_mA, uint32_t rShunt_uOhm)
+{
+    if (maxCurrent_mA < 1)
+        return ERR_MAXCURRENT_LOW;
+
+    if (rShunt_uOhm == 0)
+        return ERR_SHUNT_LOW;
+
+    uint64_t shuntCal = (static_cast<uint64_t>(maxCurrent_mA) * rShunt_uOhm) / 40000;
+
+    if (_cfg.adcrange == Adcrange::Range_40mv)
+        shuntCal *= 4;
+
+    if (shuntCal > 0xFFFF)
+        return ERR_CAL_OVERFLOW;
+    if (shuntCal == 0)
+        return ERR_CAL_OVERFLOW;
+
+    _cfg.maxCurrent_mA = maxCurrent_mA;
+    _cfg.r_shunt_uOhm   = rShunt_uOhm;
+    _cfg.shuntCal       = static_cast<uint16_t>(shuntCal);
+    _updateCurrentLSB();
+
+    writeRaw(REG_SHUNT_CAL, _cfg.shuntCal, 2);
+    return ERR_NONE;
+}
+
+// ============================================================
+//  连接 / 错误
+// ============================================================
+
+bool INA228::isConnected()
+{
+    (void)readRaw(REG_MANUFACTURER_ID);
+    return _dev.lastError() == 0;
+}
+
+int INA228::getLastError()
+{
+    return _dev.lastError();
 }
 
 // ============================================================
@@ -36,6 +97,13 @@ INA228::~INA228()
 
 void INA228::init()
 {
+    // 0. 自动校准：由采样电阻与最大电流推导 SHUNT_CAL + LSB
+    //    （默认 163840 mA / 1 mΩ → 0x1000，与原默认值一致）
+    if (_cfg.r_shunt_uOhm != 0)
+    {
+        (void)setMaxCurrentShunt(_cfg.maxCurrent_mA, _cfg.r_shunt_uOhm);
+    }
+
     // 1. 配置寄存器
     writeRaw(REG_CONFIG,     buildConfigReg(),    2);
     writeRaw(REG_ADC_CONFIG, buildADCConfigReg(), 2);
@@ -50,30 +118,16 @@ void INA228::init()
     //    INA228 开漏 ALERT 引脚在锁存模式下只要状态位非零就持续拉低，
     //    即使外部有上拉电阻也拉不回来。读取 DIAG_ALRT 是唯一清除手段。
     //    因此 init 末尾必须读一次，将上电锁存标志清掉以释放 ALERT 引脚。
-    //    修复前缺少此读操作，导致主电源电路一直被 ALERT 拉低无法导通。
     (void)readRaw(REG_DIAG_ALERT);
 
     // 5. 阈值默认不触发，用户调用 set_xxx_limit() 覆盖
 
     // 6. 自动配置报警引脚（Config 中指定了 GPIO 端口和引脚时）
-    //    零堆分配：直接用 GPIO 寄存器，不创建 io_ctrl 对象
+    //    零堆分配：io_ctrl 为成员对象（非指针），移动赋值接管引脚所有权
     if (_cfg.alert_port != 0 && _cfg.alert_pin != 0)
     {
-        _alertPort    = _cfg.alert_port;
-        _alertPinMask = _cfg.alert_pin;
-
-        // 使能 GPIO 时钟
-        if      (_alertPort == GPIOA) rcu_periph_clock_enable(RCU_GPIOA);
-        else if (_alertPort == GPIOB) rcu_periph_clock_enable(RCU_GPIOB);
-        else if (_alertPort == GPIOC) rcu_periph_clock_enable(RCU_GPIOC);
-        else if (_alertPort == GPIOD) rcu_periph_clock_enable(RCU_GPIOD);
-        else if (_alertPort == GPIOE) rcu_periph_clock_enable(RCU_GPIOE);
-        else if (_alertPort == GPIOF) rcu_periph_clock_enable(RCU_GPIOF);
-        else if (_alertPort == GPIOG) rcu_periph_clock_enable(RCU_GPIOG);
-
-        // 开漏 ALERT → 输入 + 上拉
-        gpio_mode_set(_alertPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, _alertPinMask);
-        _alertCfg = true;
+        _alertPinAuto = io_ctrl(_cfg.alert_port, _cfg.alert_pin);  // 释放旧引脚 + 接管新引脚
+        _alertPinAuto.init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);     // 时钟使能 + 上拉输入
     }
 }
 
@@ -106,13 +160,13 @@ uint8_t INA228::regLen(uint8_t reg)
 
 void INA228::writeRaw(uint8_t reg, uint64_t data, uint8_t len)
 {
-    _dev.i2c_freedom_write(reg, data, len);
+    _dev.freedom_write(reg, data, len);
 }
 
 uint64_t INA228::readRaw(uint8_t reg)
 {
     uint64_t data = 0;
-    _dev.i2c_freedom_read(reg, &data, regLen(reg));
+    _dev.freedom_read(reg, &data, regLen(reg));
     return data;
 }
 
@@ -166,17 +220,21 @@ int32_t INA228::rawToBusVoltage_mV(uint64_t raw)
     return (val * 25) >> 7;
 }
 
-int32_t INA228::rawToShuntVoltage_uV(uint64_t raw)
+int32_t INA228::rawToShuntVoltage_uV(uint64_t raw) const
 {
-    // 312.5 nV/LSB = 5/16 µV/LSB (ADCRANGE=0)
+    // ADCRANGE=0（163.84 mV 档）: 312.5 nV/LSB = 5/16 µV/LSB
+    // ADCRANGE=1（ 40.96 mV 档）:  78.125 nV/LSB = 5/64 µV/LSB
     int32_t val = signExtend<20>(raw >> 4);
+    if (_cfg.adcrange == Adcrange::Range_40mv)
+        return (val * 5) >> 6;
     return (val * 5) >> 4;
 }
 
 int32_t INA228::rawToCurrent_mA(uint64_t raw) const
 {
     int32_t val = signExtend<20>(raw >> 4);
-    return (val * _currentLSB_uA) / 1000;
+    return static_cast<int32_t>(
+        (static_cast<int64_t>(val) * _currentLSB_nA) / 1000000);
 }
 
 int32_t INA228::rawToTemperature_mC(uint64_t raw)
@@ -189,26 +247,29 @@ int32_t INA228::rawToTemperature_mC(uint64_t raw)
 int32_t INA228::rawToPower_mW(uint64_t raw) const
 {
     // Power(W) = 3.2 × CURRENT_LSB × reg
-    // Power(mW) = reg × 3.2 × _currentLSB_uA / 1000
-    //           = reg × 16 × _currentLSB_uA / 5000
+    // Power(mW) = reg × 3.2 × LSB_nA × 1e-3
+    //           = reg × 16 × LSB_nA / 5e6
     int64_t val = static_cast<int64_t>(raw);
-    return static_cast<int32_t>((val * 16 * _currentLSB_uA) / 5000);
+    return static_cast<int32_t>((val * 16 * _currentLSB_nA) / 5000000);
 }
 
 int64_t INA228::rawToEnergy_mJ(uint64_t raw) const
 {
+    // ENERGY 寄存器为 40-bit 无符号（数据手册），不做符号扩展
     // Energy(J) = 16 × 3.2 × CURRENT_LSB × reg
-    // Energy(mJ) = reg × 32 × _currentLSB_uA / 625
-    int64_t val = signExtend<40>(raw);
-    return (val * 32 * _currentLSB_uA) / 625;
+    // Energy(mJ) = reg × 32 × LSB_nA / 625000
+    uint64_t val = raw;
+    return static_cast<int64_t>(
+        (val * 32 * static_cast<uint64_t>(_currentLSB_nA)) / 625000);
 }
 
 int64_t INA228::rawToCharge_mC(uint64_t raw) const
 {
+    // CHARGE 寄存器为 40-bit 有符号（数据手册）
     // Charge(C) = CURRENT_LSB × reg
-    // Charge(mC) = reg × _currentLSB_uA / 1000
+    // Charge(mC) = reg × LSB_nA / 1e6
     int64_t val = signExtend<40>(raw);
-    return (val * _currentLSB_uA) / 1000;
+    return (val * _currentLSB_nA) / 1000000;
 }
 
 // ============================================================
@@ -302,15 +363,31 @@ void INA228::set_temp_limit_C(uint8_t temp_C)
 
 void INA228::set_pwr_limit_mW(uint32_t pwr_mW)
 {
-    // Power(mW) = reg × 16 × _currentLSB_uA / 5000
-    // → reg = pwr_mW × 5000 / (16 × _currentLSB_uA)
-    if (_currentLSB_uA == 0) return;
+    // PWR_LIMIT 阈值 LSB = 256 × Power_LSB（数据手册 7.6.1.17）
+    // Power(mW) = reg × 16 × LSB_nA / 5e6 × 256
+    // → reg = pwr_mW × 5e6 / (16 × 256 × LSB_nA)
+    //       = pwr_mW × 5e6 / (4096 × LSB_nA)
+    // 修复前缺少 ×256 因子，阈值被写小 256 倍，报警在设定功率的 1/256 就触发。
+    if (_currentLSB_nA == 0) return;
 
-    uint64_t num = static_cast<uint64_t>(pwr_mW) * 5000;
-    uint32_t den = static_cast<uint32_t>(_currentLSB_uA) * 16;
+    uint64_t num = static_cast<uint64_t>(pwr_mW) * 5000000;
+    uint64_t den = static_cast<uint64_t>(_currentLSB_nA) * 4096;
     uint16_t reg_value = static_cast<uint16_t>(num / den);
 
     writeRaw(REG_PWR_LIMIT, reg_value, 2);
+}
+
+void INA228::setShuntTempco(uint16_t ppm)
+{
+    if (ppm > 16383) ppm = 16383;
+    writeRaw(REG_SHUNT_TEMPCO, ppm, 2);
+}
+
+void INA228::reset()
+{
+    // 写 CONFIG 的 RST 位触发软复位，寄存器恢复默认值
+    writeRaw(REG_CONFIG, static_cast<uint16_t>(0x8000u | buildConfigReg()), 2);
+    _currentLSB_nA = 0;               // 复位后校准丢失
 }
 
 // ============================================================
@@ -328,9 +405,9 @@ bool INA228::isAlertAsserted()
     if (_alertPin)
         return _alertPin->read() == RESET;
 
-    // 否则使用自动配置的引脚
-    if (_alertCfg)
-        return gpio_input_bit_get(_alertPort, _alertPinMask) == RESET;
+    // 否则使用 Config 自动配置的引脚（io_ctrl 成员，未配置时无效）
+    if (_alertPinAuto.is_initialized())
+        return _alertPinAuto.read() == RESET;
 
     return false;
 }

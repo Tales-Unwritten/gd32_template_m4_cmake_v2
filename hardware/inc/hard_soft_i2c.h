@@ -29,8 +29,8 @@ void Soft_W_SCL(I2C_Info *i2c,uint8_t BitValue);
 void Soft_W_SDA(I2C_Info *i2c,uint8_t BitValue);
 uint8_t Soft_R_SDA(I2C_Info *i2c); // Read SDA data
 
-void Soft_I2C_Start(I2C_Info *i2c);
-void Soft_I2C_Stop(I2C_Info *i2c);
+void Soft_start(I2C_Info *i2c);
+void Soft_stop(I2C_Info *i2c);
 void Soft_I2C_WriteByte(I2C_Info *i2c,uint8_t Byte);
 uint8_t Soft_I2C_ReceiveByte(I2C_Info *i2c);
 void Soft_I2C_WriteAck(I2C_Info *i2c,uint8_t AckBit);

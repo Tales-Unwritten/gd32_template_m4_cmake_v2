@@ -76,11 +76,11 @@ void Soft_I2C_Init(I2C_Info *i2c, uint32_t GPIOx, uint16_t SCL, uint16_t SDA, ui
 	Soft_W_SDA(i2c, 1);
 
 	// 发送一个完整的起始-停止序列来清理总线状态
-	Soft_I2C_Start(i2c);
-	Soft_I2C_Stop(i2c);
+	Soft_start(i2c);
+	Soft_stop(i2c);
 }
 
-void Soft_I2C_Start(I2C_Info *i2c)
+void Soft_start(I2C_Info *i2c)
 {
 	Soft_W_SDA(i2c, 1);
 	Soft_W_SCL(i2c, 1);
@@ -88,7 +88,7 @@ void Soft_I2C_Start(I2C_Info *i2c)
 	Soft_W_SCL(i2c, 0);
 }
 
-void Soft_I2C_Stop(I2C_Info *i2c)
+void Soft_stop(I2C_Info *i2c)
 {
 	Soft_W_SDA(i2c, 0);
 	Soft_W_SCL(i2c, 1);
@@ -144,30 +144,30 @@ uint8_t Soft_I2C_ReceiveAck(I2C_Info *i2c)
 
 void Soft_I2C_WriteReg(I2C_Info *i2c,uint8_t RegAddress, uint8_t Data)
 {
-	Soft_I2C_Start(i2c);
+	Soft_start(i2c);
 	Soft_I2C_WriteByte(i2c, i2c->I2C_Add << 1);
 	Soft_I2C_ReceiveAck(i2c);
 	Soft_I2C_WriteByte(i2c, RegAddress);
 	Soft_I2C_ReceiveAck(i2c);
 	Soft_I2C_WriteByte(i2c, Data);
 	Soft_I2C_ReceiveAck(i2c);
-	Soft_I2C_Stop(i2c);
+	Soft_stop(i2c);
 }
 
 uint8_t Soft_I2C_ReadReg(I2C_Info *i2c,uint8_t RegAddress)
 {
 	uint8_t Data = 0;
 
-	Soft_I2C_Start(i2c);
+	Soft_start(i2c);
 	Soft_I2C_WriteByte(i2c, i2c->I2C_Add << 1);
 	Soft_I2C_ReceiveAck(i2c);
 	Soft_I2C_WriteByte(i2c, RegAddress);
 	Soft_I2C_ReceiveAck(i2c);
-	Soft_I2C_Start(i2c);
+	Soft_start(i2c);
 	Soft_I2C_WriteByte(i2c, i2c->I2C_Add << 1 | 0x01); //|0x01将最低位置1，代表读操作
 	Soft_I2C_ReceiveAck(i2c);
 	Data = Soft_I2C_ReceiveByte(i2c);
 	Soft_I2C_WriteAck(i2c, 1); // 发送NACK，表示读取结束
-	Soft_I2C_Stop(i2c);
+	Soft_stop(i2c);
 	return Data;
 }

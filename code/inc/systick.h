@@ -35,13 +35,23 @@ OF SUCH DAMAGE.
 #define SYS_TICK_H
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* configure systick */
 void systick_config(void);
 /* delay a time in milliseconds */
 void delay_ms(uint32_t count);
 void delay_us(uint32_t count);
 void delay_ns(uint32_t count);
-/* delay decrement */
-void delay_decrement(void);
+/* tick increment (called by SysTick_Handler, 1000 Hz) */
+void tick_increment(void);
+/* get current tick in ms (equivalent to STM32 HAL_GetTick) */
+uint32_t get_tick(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* SYS_TICK_H */

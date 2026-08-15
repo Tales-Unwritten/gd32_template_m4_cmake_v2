@@ -45,7 +45,10 @@
 #include "modbus.hpp"
 #include <cstring>
 
-#include "device_debug.hpp"
+#include "device_serial.hpp"
+#include "inter_soft_uart.hpp"
+
+extern soft_uart_port suart;   // 定义于 user/src/founction.cpp（软串口测试模式）
 
 
 static void Modbus_Function01(void);
@@ -59,10 +62,10 @@ static void Modbus_Function16(void);
 
 modbus_t Modbus;
 
-static void Debug_Send_IT(uint8_t *b, uint16_t l) { (void)debug_uart.send_data_it(b, l); }
+static void Debug_Send_IT(uint8_t *b, uint16_t l) { (void)suart.send_data_it(b, l); }
 
 const modbus_port_t modbus_ports[] = {
-    { debug_uart.buffer(), Debug_Send_IT },
+    { suart.buffer(), Debug_Send_IT },
     // { &pc_uart2_buffer,   UART2_Send },
     // { &pc_uart3_buffer,   UART3_Send },
 };

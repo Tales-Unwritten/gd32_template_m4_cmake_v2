@@ -4,7 +4,7 @@
 
 #ifdef __cplusplus
 #include "inter_usart.hpp"
-#include "device_debug.hpp"
+#include "device_serial.hpp"
 #endif
 
 #ifdef __cplusplus

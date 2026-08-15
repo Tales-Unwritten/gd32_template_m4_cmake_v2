@@ -1,5 +1,286 @@
 # Changelog
 
+## 2026-08-15 — 软串口适配 usart_port 接口 + Modbus 板载验证
+
+### Changed（inter_soft_uart 接口对齐 usart_port 标准）
+
+- 新增 `send_data/send_data_it`（bool 阻塞发送，send_data_it 软串口退化为同步）、
+  `buffer()`（复用 `uart_buffer_t` 类型，协议层零适配）、`periph()`（恒 0）、
+  `rx_buf_capacity()`、`poll()`（主循环轮询接收 + 空闲判帧）
+- 接收缓冲区零堆分配静态数组 256B（Modbus ADU 上限）
+
+### 板载验证（PA9/PA10 软串口 115200，Modbus RTU 从站）
+
+- ✅ 软串口 TX：自检输出全部经位反转发出，PC 正常接收
+- ✅ 软串口 RX + 判帧 + Modbus 桥接：0x03/0x04 请求完整收发，CRC 校验通过，
+  INA228 数据真实（BusV=5.242V, T=33.55°C）
+
+### 轮询式软串口两个关键设计结论（踩坑记录）
+
+1. **判帧阈值必须 > 主循环周期**：3.5 字符（304µs）< 主循环周期时会提前断帧，
+   阈值取 20 字符（`FRAME_IDLE_CHARS`）
+2. **主循环周期必须 < 字节时长**（87µs @115200）：`UpdateModbusRegisters` 软 I2C
+   读取改为每 100ms 刷新（原每循环刷新导致主循环 ~1ms，poll 错过起始位）
+
+### 测试模式说明（当前固件状态）
+
+- 软串口占用 PA9/PA10（与硬件 debug_uart 冲突），`DebugPort_Init()` 临时禁用
+- `ACTIVE_PROTOCOL` = PROTOCOL_MODBUS；Modbus 端口表挂软串口
+- 恢复硬件模式：`founction.cpp` 恢复 `DebugPort_Init()`、`protocol_conf.hpp` 恢复协议宏、
+  `modbus.cpp` 端口表改回 debug_uart
+
+---
+
+## 2026-08-15 — 新增软件串口（inter_soft_uart）
+
+### Added
+
+- `interface/inc/inter_soft_uart.hpp` + `interface/src/inter_soft_uart.cpp`：
+  软件串口（GPIO 位反转 + DWT 周期计数精确时序），由用户提供的纯 C 版改写为 C++ inter 风格
+
+**改造要点**：
+
+- GPIO 寄存器直操作（`GPIO_BOP/BC/ISTAT`）→ `io_ctrl` 组合（铁律 2.5）
+- C 函数 → `soft_uart_port` 类：Config POD、init/deinit 生命周期、禁拷贝、零堆分配
+- 主频硬编码 240MHz → `SystemCoreClock` 变量（改时钟配置自动适配）
+- `getc()` 超时从 NOP 忙等 → `get_tick()` 毫秒精度
+- 保留核心算法：下降沿检测起始位、毛刺过滤、中点采样、溢出安全的 DWT 忙等
+
+**API**：`putc/puts/write`（阻塞发送）、`try_getc`（非阻塞轮询）、`getc(byte, timeout_ms)`、
+`set_baud`、`init/deinit`；波特率常量 `BAUD_9600 ~ BAUD_115200`
+
+### 说明
+
+- 原目录 `interface/soft_uart/`（含 `__MACOSX` 解压垃圾）待用户确认后删除
+- 板载验证需用户提供 2 个空闲引脚（TX/RX），或 TX-RX 短接回环测试
+
+---
+
+## 2026-08-15 — W25Q 软 SPI 板载实测（inter_soft_spi 硬件验证）
+
+### 板载实测结果（W25Q128JV-IM @ PF6/7/8/9，MODE0，delay=0）
+
+- ✅ `inter_soft_spi` 全部功能实测通过：JEDEC ID 读取、状态寄存器、扇区擦除、页编程、读回比对（32B MATCH）
+- ✅ 零延时（delay_us=0）下时序正确，无位错误
+- ℹ️ 板载芯片实际为 **W25Q128JV-IM**（JEDEC `EF 70 18`，16MB），非 W25Q64（`EF 40 17`）；
+  测试 ID 校验已按实际芯片更新
+- ⚠️ 测试擦除了 0xFF0000 扇区（4KB）用于擦写回环验证
+
+### Fixed
+
+- `code/inc/systick.h`：添加 `extern "C"` 保护（C++ 文件直接 include 时链接失败的根治；
+  此前仅通过 link.h 间接声明才可用）
+
+---
+
+## 2026-08-15 — 新增软件 SPI 总线（inter_soft_spi）
+
+### Added
+
+- `interface/inc/inter_soft_spi.hpp` + `interface/src/inter_soft_spi.cpp`：
+  软件 SPI 总线（GPIO 位操作模拟，阻塞全双工）
+
+**架构**（对齐 `inter_i2c_bus` 总线模式）：
+
+- SCK/MOSI/MISO 共享总线由单对象独占管理（含 IRQ-safe 互斥锁）
+- CS 双模式：内部单 CS（`cs_select/cs_deselect`）或外部 CS（多设备共享总线）
+- 零堆分配：4 个 `io_ctrl` 成员对象
+
+**API**：`init/deinit`、`transfer(tx,rx,len)`（tx/rx 可空可同址）、`transfer_byte`、
+`cs_select/cs_deselect`、`set_mode(0..3)`、`set_bit_order`、`set_speed(delay_us)`、`lock/unlock`
+
+**实现要点**：
+
+- 位循环统一 4 种 SPI 模式（CPOL/CPHA 一张逻辑覆盖，无分支复制）
+- `delay_us=0` 为空操作（`while(us--)` 先判后减），速率由 io_ctrl 位操作开销决定（约 1MHz 级）
+- 设计决策：不增设设备层（SPI 设备协议差异大，无统一寄存器抽象，transfer 原语即最优抽象）
+
+**参考**：Rob Tillaart SWSPI（mode/bitOrder 语义）、项目 inter_i2c_bus（互斥/延时/io_ctrl 组合）
+
+### 验证
+
+- 编译通过零警告 ✅
+- 4 种模式时序已在实现注释中逐模式验证（采样沿/数据稳定顺序）
+- 硬件回环测试（MOSI↔MISO 短接）待用户按需执行
+
+---
+
+## 2026-08-15 — Zed 任务二次优化（参考 STM32F407 工程风格）
+
+### Changed
+
+- `.zed/tasks.json` 按用户提供的 STM32F407 参考工程风格重构：
+  - 新增 `Build (Release)` / `Build + Flash (Release)`（验证 release preset 可用）
+  - 烧录命令增加 `--speed 4000`（实测 1.84s，比默认快约一倍）与 `--verify`
+  - `Erase Chip` 使用 `--connect-under-reset` 增强擦除成功率
+  - 并行编译 `-j$(nproc 2>/dev/null || echo 4)`（build preset 已含 jobs:16，双保险）
+  - 全部任务 `reveal: always` + emoji 标签，chip 参数内联（换芯片搜索替换 `STM32F429ZI`）
+  - 保留本项目特有任务：`Serial Monitor` / `GDB Server`(1337) / `GDB Client` / `Reset Target`
+
+### Fixed（参考文件本身的笔误，未照搬）
+
+- 参考中 `release + Flash` 误用 Debug 目录的 elf → 已修正为 `build/release/gd32f470_template.elf`
+- 参考中 download/reset 芯片名不一致（ZETx/VGTx 混用）→ 统一为 STM32F429ZI
+
+### 验证
+
+- JSONC 解析通过（11 个任务）
+- `--speed 4000` 实测烧录 1.84s verify OK ✅
+- Release preset 全量编译通过 ✅（FLASH 21576B，比 Debug 小约 1.9KB）
+
+---
+
+## 2026-08-15 — Zed 任务优化：OpenOCD → probe-rs
+
+### Changed
+
+- `.zed/tasks.json` 全部重写，烧录/调试链路从 OpenOCD 迁移到 **probe-rs**：
+  - 8 个 OpenOCD/JLink 任务 → 10 个任务（Build / Clean+Rebuild / Flash+Run / Flash Only /
+    Build+Flash+Run / Reset / Erase / GDB Server / GDB Client / Serial Monitor）
+  - 统一环境变量 `PROBE_RS_CHIP` / `PROBE_RS_PROTOCOL=swd` / `PROBE_RS_NON_INTERACTIVE`，
+    换芯片/调试器只需改 env
+  - 新增 `Serial Monitor`（python 直读 /dev/ttyACM1 @115200）
+  - 任务按 `tags` 分类（build / flash / debug / monitor / danger）
+
+### 关键发现（实测验证）
+
+- probe-rs 0.31 芯片库**无 GD32F470**，但 GD32F4 的 FMC 与 STM32F4 寄存器兼容，
+  实测 `--chip STM32F429ZI --protocol swd` 可正常连接、烧录（3.23s）、verify 通过、复位运行
+- probe-rs `download` 烧录后**不会自动运行**，需 `probe-rs run`（烧录+运行）或 `probe-rs reset`
+- probe-rs GDB server 默认端口 **1337**（非 OpenOCD 的 3333）
+
+### 验证
+
+- probe-rs download + verify + reset 全流程实测通过 ✅
+- 板载程序运行正常（Vbus=3.29V 采样正常，5V 过压阈值正确未触发）
+
+---
+
+## 2026-08-15 — 构建升级 C++20（designated initializers）
+
+### Changed
+
+- `CMakeLists.txt`：`CMAKE_CXX_STANDARD` 17 → **20**，使能指定初始化（designated initializers），
+  Config 结构体初始化可只写需要修改的字段，其余用默认值（与字段类型、字段位置无关）
+- `user/src/founction.cpp`：`ina228_cfg` 从全字段 20 行聚合初始化简化为
+  `{.alert_port = GPIOG, .alert_pin = GPIO_PIN_14}` 两行
+
+### 影响范围
+
+- 其他 INA 家族（219/226/260/3221）的 `Config` 同样受益：目前工程中无其他 Config 实例化点，无需额外修改
+- 枚举 class 与数值型字段均不受影响（聚合初始化规则与字段类型无关）
+
+### 验证
+
+- 重新配置 + 全量编译零警告 ✅ FLASH 23496B (1.12%) / RAM 5456B (0.76%)
+- DAP-Link 烧录 Verify OK ✅
+
+---
+
+## 2026-08-15 — INA228 板载验证测试（开发板实测）
+
+### Added
+
+- `user/src/founction.cpp`：INA228 注册报警引脚 **PG14**（`Config::alert_port=GPIOG, alert_pin=GPIO_PIN_14`），
+  新增 `ina228_selftest()` 全功能自检（连接/ID → 校准 → 测量 → 阈值写入 → 报警触发/清除 → 寄存器 dump → 软复位恢复）
+- 主循环每秒周期采样打印 `[INA228] Vbus/I/P/T/ALERT`
+
+### Fixed
+
+- `device_serial.cpp`：debug_uart 波特率 460800 → **115200**（对齐 AGENTS.md 规范）
+- 自检输出适配 newlib-nano：`%lld` → `%ld` 分段打印（nano printf 不支持 64 位格式）
+- 自检 BUVL 恢复值 100mV → 0（VBUS=0 时任何正阈值都会持续触发欠压）
+
+### 板载实测结果（DAP-Link 烧录 + debug 串口 115200）
+
+| 项目 | 结果 |
+|------|------|
+| I2C 连接 / MFR=0x5449 / DEV=0x2281 | ✅ |
+| 校准 2A@1mΩ（err=0, LSB=3814nA） | ✅ 理论值 3814.7nA 一致 |
+| 温度测量 33.6°C | ✅ 真实读数 |
+| 欠压报警（BUVL=20V 触发→清除） | ✅ pin=LOW→HIGH |
+| 温度过限报警（0°C 触发→清除） | ✅ pin=LOW→HIGH |
+| 分流过压报警（SOVL=1mA） | ✅ 触发 |
+| 过压/过功率报警 | ✅ 逻辑自洽（VBUS=0 时正确不触发） |
+| 寄存器 dump / 软复位后恢复 | ✅ connected=1 |
+
+⚠️ **硬件提示**：VBUS 恒为 0（芯片 I2C 正常、温度真实），疑似 INA228 的 IN+/IN- 未接入被测电源，需检查板级接线。
+
+---
+
+## 2026-08-15 — INA 家族驱动统一移植（INA219/228/260/3221）
+
+### Refactored
+
+按 INA226 已批准模式统一移植 4 款新增 INA 器件驱动，消除 STM32 HAL / Arduino 残留：
+
+| 文件 | 清除的违规代码 |
+|------|----------------|
+| `device_ina219.cpp` | `HAL_GPIO_Init`/`HAL_GPIO_ReadPin`/`HAL_GetTick`/`delay.hpp`(不存在) |
+| `device_ina228.cpp` | `HAL_GPIO_Init`/`HAL_GPIO_ReadPin` |
+| `device_ina260.cpp` | `HAL_GPIO_Init`/`HAL_GPIO_ReadPin`/`HAL_GetTick`/`delay.hpp`(不存在) |
+| `device_ina3221.cpp` | `HAL_GPIO_Init`/`HAL_GPIO_ReadPin`/`HAL_GetTick`/`delay.hpp`(不存在) |
+
+- 4 个头文件私有成员 `_alertPort`/`_alertPinMask`/`_alertCfg` → `io_ctrl _alertPinAuto{0, 0}`（零堆分配）
+- `init()` 报警引脚自动配置改用 `io_ctrl` 移动赋值 + `init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP)`
+- `isAlertAsserted()` 改用 `_alertPinAuto.read()`，未配置时安全返回 false
+- `waitConversionReady()`（219/260/3221）`HAL_GetTick` → `get_tick()`
+- `#include "delay.hpp"` → `#include "systick.h"`（delay.hpp 不存在，原代码无法编译）
+
+### Fixed
+
+- `CMakeLists.txt`：删除 5 个不存在的 device 源文件引用（`device_debug/rs485/rs232/w25q128.cpp`），
+  加入 `device_serial.cpp` 与 4 个 INA 文件，恢复可构建
+- `modbus.hpp` / `modbus.cpp` / `string_pro.cpp` / `founction.hpp` / `founction.cpp`：
+  `#include "device_debug.hpp"` → `"device_serial.hpp"`（文件已合并）
+- `founction.cpp`：`i2c_bus.i2c_init()` → `i2c_bus.init()`（旧 API 残留）
+
+### 兼容性
+
+- 公开接口零变化：构造、`Config::alert_port/alert_pin`、`bindAlertPin(io_ctrl*)` 均不变
+- 行为改善：报警引脚随 `io_ctrl` RAII 释放；重复 `init()` 换引脚自动释放旧引脚
+
+### 验证
+
+- 全量编译链接通过 ✅ FLASH 17712B (0.84%) / RAM 5448B (0.76%)，零警告（仅链接器 RWX 段提示，与本次无关）
+
+---
+
+## 2026-08-15 — INA226 去 STM32 HAL 残留 + SysTick 毫秒 tick 服务
+
+### Refactored
+
+- `device_ina226.cpp` 报警引脚自动配置改为使用 `io_ctrl` 成员对象（`_alertPinAuto`），
+  替换直接调用 STM32 HAL GPIO（`HAL_GPIO_Init` / `HAL_GPIO_ReadPin`）的移植残留代码，
+  符合铁律 2.1/2.5（SDK 调用仅限 `interface/src/`，GPIO 唯一抽象为 `io_ctrl`）
+- 私有成员 `_alertPort` / `_alertPinMask` / `_alertCfg` 合并为 `io_ctrl _alertPinAuto{0, 0}`（零堆分配）
+- `isAlertAsserted()` 优先外部 `bindAlertPin` 引脚，其次自动配置引脚（`is_initialized()` 判有效）
+- 行为差异：INA226 析构时自动配置引脚随 `io_ctrl` RAII 释放（deinit 为模拟输入）；
+  重复 `init()`/`setConfig()` 换引脚时移动赋值先释放旧引脚
+
+### Added
+
+- `systick.c`：新增 `get_tick()` 毫秒 tick 服务（SysTick 1kHz 递增计数），
+  替代 STM32 `HAL_GetTick`；原 `delay_decrement()` 更名为 `tick_increment()`（语义与行为一致）
+
+### Fixed
+
+- `device_ina226.cpp` 补 `#include "device_serial.hpp"`（`dumpRawRegisters` 等使用 `debug_uart`）
+
+### 涉及文件
+
+- `device/inc/device_ina226.hpp` — 成员替换
+- `device/src/device_ina226.cpp` — GPIO 重构 + `get_tick()` + include 修复
+- `code/inc/systick.h` / `code/src/systick.c` — tick 服务
+- `code/src/gd32f4xx_it.c` — `SysTick_Handler` 调用 `tick_increment()`
+
+### 验证
+
+- 相关 4 个源文件编译通过 ✅
+- 全量链接因云端提交 `4ac82bf` 自身不完整（CMakeLists 引用 6 个不存在的 device 源文件）而失败，待修复
+
+---
+
 ## 2026-06-13 — AT24Cxx 统一 EEPROM 驱动框架
 
 ### Added
@@ -33,7 +314,7 @@
 - `_wait_write_cycle` ACK 轮询 + 可配置超时
 - `write_verified` 写入后逐字节回读比对
 - `read_config` / `write_config` 含 magic(0xA5E5) + CRC16 双重校验
-- I2C 通信失败自动调用 `i2c_bus_recovery()` 恢复总线
+- I2C 通信失败自动调用 `bus_recovery()` 恢复总线
 - WP 引脚支持：默认高电平写保护，写入时拉低
 
 **设计决策**：

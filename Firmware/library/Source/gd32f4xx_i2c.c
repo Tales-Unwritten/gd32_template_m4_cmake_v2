@@ -305,7 +305,7 @@ void i2c_disable(uint32_t i2c_periph)
     \param[out] none
     \retval     none
 */
-void i2c_start_on_bus(uint32_t i2c_periph)
+void start_on_bus(uint32_t i2c_periph)
 {
     I2C_CTL0(i2c_periph) |= I2C_CTL0_START;
 }
@@ -316,7 +316,7 @@ void i2c_start_on_bus(uint32_t i2c_periph)
     \param[out] none
     \retval     none
 */
-void i2c_stop_on_bus(uint32_t i2c_periph)
+void stop_on_bus(uint32_t i2c_periph)
 {
     I2C_CTL0(i2c_periph) |= I2C_CTL0_STOP;
 }

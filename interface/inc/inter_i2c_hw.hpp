@@ -46,17 +46,17 @@ struct I2cHwConfig {
  *   i2c_hw_port bus({i2c_hw_id::i2c0, GPIOB, GPIO_PIN_6,
  *                     GPIOB, GPIO_PIN_7, GPIO_AF_4, 400000});
  *   bus.init();
- *   bus.i2c_start();
- *   bus.i2c_write_byte(0xA0);     // 设备地址 (写)
- *   bus.i2c_wait_ack();
- *   bus.i2c_write_byte(0x00);     // 寄存器地址
- *   bus.i2c_wait_ack();
- *   bus.i2c_start();              // 重复 START
- *   bus.i2c_write_byte(0xA1);     // 设备地址 (读)
- *   bus.i2c_wait_ack();
- *   uint8_t data = bus.i2c_read_byte();
- *   bus.i2c_write_ack(1);         // NACK
- *   bus.i2c_stop();
+ *   bus.start();
+ *   bus.write_byte(0xA0);     // 设备地址 (写)
+ *   bus.wait_ack();
+ *   bus.write_byte(0x00);     // 寄存器地址
+ *   bus.wait_ack();
+ *   bus.start();              // 重复 START
+ *   bus.write_byte(0xA1);     // 设备地址 (读)
+ *   bus.wait_ack();
+ *   uint8_t data = bus.read_byte();
+ *   bus.write_ack(1);         // NACK
+ *   bus.stop();
  *
  * 设备级使用示例（封装推荐）：
  *   bus.i2c_write_reg(0x50, 0x00, tx_data, 2);
@@ -77,18 +77,18 @@ public:
 
     // 总线控制（兼容 inter_i2c_bus 接口） ──────────────
 
-    void    i2c_start();        ///< 起始条件（等待总线空闲）
+    void    start();        ///< 起始条件（等待总线空闲）
     void    i2c_restart();      ///< 重复起始条件（不等待空闲，总线已占有）
-    void    i2c_stop();
-    void    i2c_write_byte(uint8_t data);
-    uint8_t i2c_read_byte();
-    bool    i2c_wait_ack(uint16_t timeout = 1000);
-    void    i2c_write_ack(uint8_t ack);    // 0=ACK, 1=NACK
+    void    stop();
+    void    write_byte(uint8_t data);
+    uint8_t read_byte();
+    bool    wait_ack(uint16_t timeout = 1000);
+    void    write_ack(uint8_t ack);    // 0=ACK, 1=NACK
 
     // ── 互斥 ──────────────────────────────────────────────
-    void    i2c_lock();
-    void    i2c_unlock();
-    [[nodiscard]] uint8_t i2c_is_busy() const { return _busy; }
+    void    lock();
+    void    unlock();
+    [[nodiscard]] uint8_t is_busy() const { return _busy; }
 
     // ── 设备级便利方法（基于总线操作实现） ───────────────
 

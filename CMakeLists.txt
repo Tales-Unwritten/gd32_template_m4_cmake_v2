@@ -50,7 +50,8 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20：支持 designated initializers，Config 可只配置部分字段
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ============================================================
@@ -150,14 +151,16 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/inter_flash.cpp        # 内部 Flash 读写
     interface/src/inter_i2c_bus.cpp    # I2C 总线
     interface/src/inter_i2c_dev.cpp    # I2C 设备基类
+    interface/src/inter_soft_spi.cpp   # 软件 SPI 总线（GPIO 位操作）
+    interface/src/inter_soft_uart.cpp  # 软件串口（位反转 + DWT 时序）
 
     # ── device 设备驱动 ────────────────────────────────
+    device/src/device_serial.cpp                  # 串口设备（debug/rs232/rs485 + DE）
     device/src/device_ina226.cpp                  # INA226 电压/电流传感器
     device/src/device_ina228.cpp                  # INA228 高精度传感器
-    device/src/device_debug.cpp              # Debug 串口 (USART0)
-    device/src/device_rs485.cpp              # RS485 串口 (USART1, DE=PG13)
-    device/src/device_rs232.cpp              # RS232 串口 (USART2)
-    device/src/device_w25q128.cpp               # W25Q128 Flash 全功能驱动
+    device/src/device_ina219.cpp                  # INA219 电压/电流传感器
+    device/src/device_ina260.cpp                  # INA260 内置分流传感器
+    device/src/device_ina3221.cpp                 # INA3221 3 通道传感器
 
     # ── Modbus 协议栈 ───────────────────────────────
     protocol/modbus/src/modbus_crc.cpp         # CRC 校验

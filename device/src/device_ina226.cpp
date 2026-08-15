@@ -1,19 +1,18 @@
-#include "device_ina226.hpp"
-#include "link.h"
-#include "inter_usart.hpp"
 
-extern usart_port debug_uart;
+#include "device_ina226.hpp"
+#include "device_serial.hpp"   // debug_uart（dump 输出用）
 
 #include <cstdio>
-#include <new>
+#include "systick.h"   // get_tick()
 
 // ============================================================
 //  构造
-// ============================================================
+// ===========================================================
 
 INA226::INA226(inter_i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _alertPin(nullptr)
+    , _currentLSB_nA(0)
 {
     _updateCurrentLSB();
 }
@@ -22,6 +21,7 @@ INA226::INA226(inter_i2c_bus* bus, uint8_t addr, const Config& cfg)
     : _dev(bus, addr)
     , _cfg(cfg)
     , _alertPin(nullptr)
+    , _currentLSB_nA(0)
 {
     _updateCurrentLSB();
 }
@@ -31,14 +31,87 @@ INA226::~INA226()
 }
 
 // ============================================================
-//  Current LSB
+//  Current LSB（nA 精度，消除整数截断误差）
+//  Current_LSB = I_MAX / 2^15
+//  currentLSB_nA = maxCurrent_mA × 1e6 / 32768
 // ============================================================
 
 void INA226::_updateCurrentLSB()
 {
-    // Current_LSB = I_MAX / 2^15
-    // currentLSB_uA = maxCurrent_mA × 1000 / 32768
-    _currentLSB_uA = _cfg.maxCurrent_mA * 1000 / 32768;
+    _currentLSB_nA =
+        (static_cast<int64_t>(_cfg.maxCurrent_mA) * 1000000) / 32768;
+}
+
+// ============================================================
+//  校准（对齐 GitHub 版 setMaxCurrentShunt）
+//
+//  CAL = 0.00512 / (Current_LSB × R_shunt)
+//      = 5.12e12 / (LSB_nA × R_uOhm)
+//      （LSB_nA 单位 1e-9 A，R_uOhm 单位 1e-6 Ω，乘积单位 1e-15
+//        0.00512 / 1e-15 = 5.12e12；注意不是 5.12e9）
+//
+//  取整后的 CAL 反推实际 LSB，保证读数与芯片内部计算严格自洽：
+//    CURRENT(raw) = VSHUNT(raw) × CAL / 2048
+// ============================================================
+
+int INA226::setMaxCurrentShunt(int32_t maxCurrent_mA, uint32_t rShunt_uOhm)
+{
+    if (maxCurrent_mA < 1)
+        return ERR_MAXCURRENT_LOW;
+
+    if (rShunt_uOhm < 1000)                 // < 1 mΩ
+        return ERR_SHUNT_LOW;
+
+    // 分流满量程限制：maxCurrent × R ≤ 81.92 mV
+    // （-0.02 mV 裕量防数学溢出，与 GitHub 版一致）
+    // 单位推导：mA × µΩ = 1e-3 A × 1e-6 Ω = 1 nV
+    // 81.92 mV = 81.92e6 nV
+    if (static_cast<int64_t>(maxCurrent_mA) * rShunt_uOhm > 81900000)
+        return ERR_SHUNTVOLTAGE_HIGH;
+
+    // 名义 LSB（nA），CAL 取整后以实际 LSB 为准
+    int64_t lsb_nA =
+        (static_cast<int64_t>(maxCurrent_mA) * 1000000) / 32768;
+
+    uint64_t cal = 5120000000000ULL / (static_cast<uint64_t>(lsb_nA) * rShunt_uOhm);
+
+    // CAL 超出 15 位时 LSB 加倍、CAL 减半（同 GitHub 版 auto-scale）
+    while (cal > 0x7FFF)
+    {
+        lsb_nA *= 2;
+        cal >>= 1;
+    }
+
+    if (cal == 0)
+        return ERR_CAL_OVERFLOW;
+
+    // 用取整后的 CAL 反推实际 LSB，读数与芯片行为一致
+    int64_t lsb_actual = 5120000000000LL / (static_cast<int64_t>(cal) * rShunt_uOhm);
+    if (lsb_actual <= 0)
+        return ERR_CAL_OVERFLOW;
+
+    _cfg.maxCurrent_mA = maxCurrent_mA;
+    _cfg.rShunt_uOhm   = rShunt_uOhm;
+    _cfg.calibration   = static_cast<uint16_t>(cal);
+    _currentLSB_nA     = lsb_actual;
+
+    writeRaw(REG_CALIBRATION, _cfg.calibration);
+    return ERR_NONE;
+}
+
+// ============================================================
+//  连接 / 错误
+// ============================================================
+
+bool INA226::isConnected()
+{
+    (void)readRaw(REG_MANUFACTURER_ID);
+    return _dev.lastError() == 0;
+}
+
+int INA226::getLastError()
+{
+    return _dev.lastError();
 }
 
 // ============================================================
@@ -47,13 +120,19 @@ void INA226::_updateCurrentLSB()
 
 void INA226::init()
 {
+    // 0. 自动校准模式：由采样电阻与最大电流推导 CAL + LSB
+    if (_cfg.rShunt_uOhm != 0)
+    {
+        (void)setMaxCurrentShunt(_cfg.maxCurrent_mA, _cfg.rShunt_uOhm);
+    }
+
     // 1. 配置寄存器 (0x00)
     writeRaw(REG_CONFIG,      buildConfigReg());
 
     // 2. 校准寄存器 (0x05)
     writeRaw(REG_CALIBRATION, _cfg.calibration);
 
-    // 3. Mask/Enable (0x06) — 写配置位
+    // 3. Mask/Enable (0x06) — 写配置位 + 报警功能使能位
     writeRaw(REG_MASK_ENABLE, buildMaskEnable());
 
     // 4. Alert Limit (0x07)
@@ -62,28 +141,14 @@ void INA226::init()
     // 5. ⚠️ 上电后 AFF 等状态位可能已置位，与寄存器写入顺序无关。
     //    INA226 开漏 ALERT 引脚在锁存模式下只要状态位非零就持续拉低。
     //    读取 Mask/Enable 是唯一清除锁存标志的手段。
-    //    修复前缺少此读操作，与 INA228 同根因。
     (void)readRaw(REG_MASK_ENABLE);
 
     // 6. 自动配置报警引脚（Config 中指定了 GPIO 端口和引脚时）
-    //    零堆分配：直接用 GPIO 寄存器，不创建 io_ctrl 对象
+    //    零堆分配：io_ctrl 为成员对象（非指针），移动赋值接管引脚所有权
     if (_cfg.alert_port != 0 && _cfg.alert_pin != 0)
     {
-        _alertPort    = _cfg.alert_port;
-        _alertPinMask = _cfg.alert_pin;
-
-        // 使能 GPIO 时钟
-        if      (_alertPort == GPIOA) rcu_periph_clock_enable(RCU_GPIOA);
-        else if (_alertPort == GPIOB) rcu_periph_clock_enable(RCU_GPIOB);
-        else if (_alertPort == GPIOC) rcu_periph_clock_enable(RCU_GPIOC);
-        else if (_alertPort == GPIOD) rcu_periph_clock_enable(RCU_GPIOD);
-        else if (_alertPort == GPIOE) rcu_periph_clock_enable(RCU_GPIOE);
-        else if (_alertPort == GPIOF) rcu_periph_clock_enable(RCU_GPIOF);
-        else if (_alertPort == GPIOG) rcu_periph_clock_enable(RCU_GPIOG);
-
-        // 开漏 ALERT → 输入 + 上拉
-        gpio_mode_set(_alertPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, _alertPinMask);
-        _alertCfg = true;
+        _alertPinAuto = io_ctrl(_cfg.alert_port, _cfg.alert_pin);  // 释放旧引脚 + 接管新引脚
+        _alertPinAuto.init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);     // 时钟使能 + 上拉输入
     }
 }
 
@@ -93,12 +158,12 @@ void INA226::init()
 
 void INA226::writeRaw(uint8_t reg, uint16_t data)
 {
-    _dev.i2c_write_16bit(reg, data);
+    _dev.write_16bit(reg, data);
 }
 
 uint16_t INA226::readRaw(uint8_t reg)
 {
-    return _dev.i2c_read_16bit(reg);
+    return _dev.read_16bit(reg);
 }
 
 // ============================================================
@@ -127,11 +192,13 @@ uint16_t INA226::buildConfigReg() const
 uint16_t INA226::buildMaskEnable() const
 {
     // Mask/Enable Register (0x06):
-    //   [15:5] 保留 / 状态（读时有效）
-    //   [4:2]  状态标志（只读）
+    //   [15:10] 报警功能使能（SOL/SUL/BOL/BUL/POL/CNVR，写入有效）
+    //   [9:5]   保留 / 状态（读时有效）
+    //   [4:2]   状态标志（只读）
     //   [1]    APOL  — 报警极性
     //   [0]    ALATCH — 报警锁存
     uint16_t r = 0;
+    r |= _cfg.alertMask & 0xFC00;                 // bit15-10 报警使能
     r |= static_cast<uint16_t>(_cfg.apol)   << 1;
     r |= static_cast<uint16_t>(_cfg.alatch) << 0;
     return r;
@@ -157,16 +224,16 @@ int32_t INA226::rawToBusVoltage_mV(uint16_t raw)
 
 int32_t INA226::rawToCurrent_mA(uint16_t raw) const
 {
-    int32_t val = static_cast<int32_t>(signExtend<16>(raw));
-    return (val * _currentLSB_uA) / 1000;
+    int64_t val = signExtend<16>(raw);
+    return static_cast<int32_t>((val * _currentLSB_nA) / 1000000);
 }
 
 int32_t INA226::rawToPower_mW(uint16_t raw) const
 {
     // Power_LSB = 25 × Current_LSB
-    // Power(mW) = raw × 25 × currentLSB_uA / 1000
+    // Power(mW) = raw × 25 × LSB_nA / 1e6
     int64_t val = static_cast<int64_t>(raw);
-    return static_cast<int32_t>((val * 25 * _currentLSB_uA) / 1000);
+    return static_cast<int32_t>((val * 25 * _currentLSB_nA) / 1000000);
 }
 
 // ============================================================
@@ -200,9 +267,9 @@ bool INA226::isAlertAsserted()
     if (_alertPin)
         return _alertPin->read() == RESET;
 
-    // 否则使用自动配置的引脚
-    if (_alertCfg)
-        return gpio_input_bit_get(_alertPort, _alertPinMask) == RESET;
+    // 否则使用 Config 自动配置的引脚（io_ctrl 成员，未配置时无效）
+    if (_alertPinAuto.is_initialized())
+        return _alertPinAuto.read() == RESET;
 
     return false;
 }
@@ -240,10 +307,17 @@ void INA226::setConfig(const Config& cfg)
     _cfg = cfg;
     _updateCurrentLSB();
 
+    // 自动校准模式：由采样电阻与最大电流推导 CAL + LSB
+    if (_cfg.rShunt_uOhm != 0)
+    {
+        (void)setMaxCurrentShunt(_cfg.maxCurrent_mA, _cfg.rShunt_uOhm);
+    }
+
     writeRaw(REG_CONFIG,      buildConfigReg());
     writeRaw(REG_CALIBRATION, _cfg.calibration);
     writeRaw(REG_MASK_ENABLE, buildMaskEnable());
     writeRaw(REG_ALERT_LIMIT, _cfg.alertLimit);
+    (void)readRaw(REG_MASK_ENABLE);   // 清除锁存标志
 }
 
 void INA226::setAveraging(AvgSample mode)
@@ -263,6 +337,37 @@ void INA226::setCalibration(uint16_t cal)
 
 void INA226::setAlertLimit(uint16_t limit)
     { _cfg.alertLimit = limit; writeRaw(REG_ALERT_LIMIT, limit); }
+
+void INA226::setAlertMask(uint16_t mask)
+{
+    _cfg.alertMask = mask & 0xFC00;   // 仅 bit15-10 可写
+    writeRaw(REG_MASK_ENABLE, buildMaskEnable());
+    (void)readRaw(REG_MASK_ENABLE);   // 清除可能残留的锁存标志
+}
+
+void INA226::reset()
+{
+    // 写 CONFIG 的 RST 位触发软复位，寄存器恢复默认值
+    writeRaw(REG_CONFIG, static_cast<uint16_t>(0x8000u | buildConfigReg()));
+    _currentLSB_nA = 0;               // 复位后校准丢失
+}
+
+bool INA226::isConversionReady()
+{
+    uint16_t raw = readRaw(REG_MASK_ENABLE);
+    return (raw & 0x0008) != 0;       // bit3: CVRF
+}
+
+bool INA226::waitConversionReady(uint32_t timeout_ms)
+{
+    uint32_t start = get_tick();
+    while ((get_tick() - start) <= timeout_ms)
+    {
+        if (isConversionReady()) return true;
+        delay_ms(1);
+    }
+    return false;
+}
 
 // ============================================================
 //  设备信息

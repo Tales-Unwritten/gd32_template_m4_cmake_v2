@@ -165,9 +165,21 @@ public:
         uint32_t  alert_pin  = 0;               // 引脚掩码，如 GPIO_PIN_5
 
         // ── 校准参数 ──
+        // r_shunt_uOhm 非 0 时，init()/setConfig() 用 maxCurrent_mA 与采样电阻
+        // 自动计算 SHUNT_CAL（= 13107.2e6 × LSB × R，ADCRANGE=1 时 ×4），
+        // 等效 GitHub 版 setMaxCurrentShunt；保持 0 则使用下方 shuntCal 原值
         uint16_t shuntCal       = 0x1000;
-        uint16_t r_shunt_uOhm   = 1000;     // 采样电阻 µΩ
+        uint32_t r_shunt_uOhm   = 1000;     // 采样电阻 µΩ（0 = 手动校准模式）
         int32_t  maxCurrent_mA  = 163840;   // 最大电流 mA（用于 LSB 计算）
+    };
+
+    // ── 校准错误码（setMaxCurrentShunt 返回值）──
+    enum ErrCode : int
+    {
+        ERR_NONE           = 0,       // 成功
+        ERR_MAXCURRENT_LOW = 1,       // 最大电流过小
+        ERR_SHUNT_LOW      = 2,       // 采样电阻过小
+        ERR_CAL_OVERFLOW   = 3,       // SHUNT_CAL 超出 16 位
     };
 
     // ============================================================
@@ -179,6 +191,35 @@ public:
     ~INA228();
 
     void init();
+
+    // ============================================================
+    //  校准（对齐 GitHub 版 setMaxCurrentShunt）
+    // ============================================================
+
+    /**
+     * @brief 由最大电流与采样电阻自动计算 Current LSB 与 SHUNT_CAL 并写入芯片
+     * @param maxCurrent_mA 预期最大电流 mA（决定 Current LSB = maxCurrent / 2^19）
+     * @param rShunt_uOhm   采样电阻 µΩ（如 1 mΩ 填 1000）
+     * @return ErrCode，0 = 成功；失败时芯片状态不变
+     * @note  SHUNT_CAL = 13107.2e6 × LSB × R；ADCRANGE=1（40.96 mV 档）时 ×4
+     */
+    int setMaxCurrentShunt(int32_t maxCurrent_mA, uint32_t rShunt_uOhm);
+
+    /** @brief 是否已校准 */
+    [[nodiscard]] bool isCalibrated() const { return _currentLSB_nA != 0; }
+
+    /** @brief 当前 Current LSB（nA/LSB） */
+    int64_t getCurrentLSB_nA() const { return _currentLSB_nA; }
+
+    // ============================================================
+    //  连接 / 错误
+    // ============================================================
+
+    /** @brief I2C 探测：读 ManufacturerID 并检查总线错误 */
+    [[nodiscard]] bool isConnected();
+
+    /** @brief 最近一次寄存器操作错误码（0 = 无错误） */
+    [[nodiscard]] int getLastError();
 
     // ============================================================
     //  测量 API
@@ -202,6 +243,12 @@ public:
     void set_buvl_limit_mV(uint16_t buvl_mV);
     void set_temp_limit_C(uint8_t temp_C);
     void set_pwr_limit_mW(uint32_t pwr_mW);
+
+    /** @brief 写 SHUNT_TEMPCO 寄存器（0..16383 ppm；配合 Config::tempcomp 使用） */
+    void setShuntTempco(uint16_t ppm);
+
+    /** @brief 软复位芯片（寄存器恢复默认值，需重新 init/校准） */
+    void reset();
 
     // ============================================================
     //  报警引脚 / 标志
@@ -255,12 +302,10 @@ private:
 
     inter_i2c_dev _dev;
     Config         _cfg;
-    io_ctrl       *_alertPin    = nullptr;   // 外部报警引脚（高级用户 bindAlertPin 用）
-    uint32_t       _alertPort    = 0;         // 自动配置的 GPIO 端口
-    uint32_t       _alertPinMask = 0;         // 自动配置的引脚掩码
-    bool           _alertCfg     = false;     // 是否已自动配置
+    io_ctrl       *_alertPin    = nullptr;   // 外部报警引脚（bindAlertPin 绑定）
+    io_ctrl        _alertPinAuto{0, 0};      // 自动配置的报警引脚（Config::alert_port/alert_pin，零堆分配）
 
-    int32_t _currentLSB_uA;              // Current LSB (µA)
+    int64_t _currentLSB_nA;              // Current LSB (nA/LSB，64 位避免截断误差)
 
     // ── I2C 读写 ──────────────────────────────────────────
 
@@ -286,12 +331,16 @@ private:
     // ── 原始值 → 物理量 ───────────────────────────────────
 
     static int32_t rawToBusVoltage_mV(uint64_t raw);
-    static int32_t rawToShuntVoltage_uV(uint64_t raw);
+    int32_t rawToShuntVoltage_uV(uint64_t raw) const;   // 按 ADCRANGE 区分 LSB
     int32_t rawToCurrent_mA(uint64_t raw) const;
     static int32_t rawToTemperature_mC(uint64_t raw);
     int32_t rawToPower_mW(uint64_t raw) const;
-    int64_t rawToEnergy_mJ(uint64_t raw) const;
-    int64_t rawToCharge_mC(uint64_t raw) const;
+    int64_t rawToEnergy_mJ(uint64_t raw) const;         // 40-bit 无符号
+    int64_t rawToCharge_mC(uint64_t raw) const;         // 40-bit 有符号
+
+    // ── 更新 Current LSB ──────────────────────────────────
+
+    void _updateCurrentLSB();
 
     // ── 调试 ──────────────────────────────────────────────
 

@@ -73,10 +73,10 @@ private:
     // 探测一个地址：发地址字节，看有没有 ACK
     bool probe(uint8_t addr7)
     {
-        _bus.i2c_start();
-        _bus.i2c_write_byte(addr7 << 1);       // 写方向
-        uint8_t ack = _bus.i2c_wait_ack(500);
-        _bus.i2c_stop();
+        _bus.start();
+        _bus.write_byte(addr7 << 1);       // 写方向
+        uint8_t ack = _bus.wait_ack(500);
+        _bus.stop();
         return ack;
     }
 };
@@ -130,19 +130,19 @@ private:
         uint8_t dev_addr = (AT24C08_ADDR | ((mem_addr >> 8) & 0x03)) << 1;
         uint8_t word_addr = mem_addr & 0xFF;
 
-        _bus.i2c_start();
-        _bus.i2c_write_byte(dev_addr);
-        if (!_bus.i2c_wait_ack()) goto fail;
-        _bus.i2c_write_byte(word_addr);
-        if (!_bus.i2c_wait_ack()) goto fail;
-        _bus.i2c_write_byte(data);
-        if (!_bus.i2c_wait_ack()) goto fail;
-        _bus.i2c_stop();
+        _bus.start();
+        _bus.write_byte(dev_addr);
+        if (!_bus.wait_ack()) goto fail;
+        _bus.write_byte(word_addr);
+        if (!_bus.wait_ack()) goto fail;
+        _bus.write_byte(data);
+        if (!_bus.wait_ack()) goto fail;
+        _bus.stop();
         delay_ms(5);  // EEPROM 写周期最大 5ms
         return true;
 
     fail:
-        _bus.i2c_stop();
+        _bus.stop();
         return false;
     }
 
@@ -154,23 +154,23 @@ private:
         uint8_t word_addr = mem_addr & 0xFF;
 
         // 伪写：设置地址指针
-        _bus.i2c_start();
-        _bus.i2c_write_byte(dev_addr_w);
-        if (!_bus.i2c_wait_ack()) goto fail;
-        _bus.i2c_write_byte(word_addr);
-        if (!_bus.i2c_wait_ack()) goto fail;
+        _bus.start();
+        _bus.write_byte(dev_addr_w);
+        if (!_bus.wait_ack()) goto fail;
+        _bus.write_byte(word_addr);
+        if (!_bus.wait_ack()) goto fail;
 
         // 重复 START + 读
-        _bus.i2c_start();
-        _bus.i2c_write_byte(dev_addr_r);
-        if (!_bus.i2c_wait_ack()) goto fail;
-        *data = _bus.i2c_read_byte();
-        _bus.i2c_write_ack(1);   // NACK
-        _bus.i2c_stop();
+        _bus.start();
+        _bus.write_byte(dev_addr_r);
+        if (!_bus.wait_ack()) goto fail;
+        *data = _bus.read_byte();
+        _bus.write_ack(1);   // NACK
+        _bus.stop();
         return true;
 
     fail:
-        _bus.i2c_stop();
+        _bus.stop();
         return false;
     }
 
@@ -187,10 +187,10 @@ private:
         for (uint8_t page = 0; page < 4; page++)
         {
             uint8_t addr = AT24C08_ADDR + page;
-            _bus.i2c_start();
-            _bus.i2c_write_byte(addr << 1);
-            uint8_t ack = _bus.i2c_wait_ack(1000);
-            _bus.i2c_stop();
+            _bus.start();
+            _bus.write_byte(addr << 1);
+            uint8_t ack = _bus.wait_ack(1000);
+            _bus.stop();
 
             char name[32];
             snprintf(name, sizeof(name), "ADDR 0x%02X responds", addr);

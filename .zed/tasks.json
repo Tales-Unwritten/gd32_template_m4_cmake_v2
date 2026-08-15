@@ -1,46 +1,58 @@
 [
+  // ════════════════════════════════════════════════════════════
+  //  GD32F470 开发任务（probe-rs）
+  // ════════════════════════════════════════════════════════════
+  //  ⚠️ GD32F470 不在 probe-rs 内置芯片库中，实测使用
+  //     STM32F429ZI（2MB Flash，FMC 寄存器兼容）可正常烧录/调试。
+  //     --protocol swd 必须显式指定（probe-rs 默认 JTAG）。
+  //     换芯片时搜索替换 "STM32F429ZI" 即可。
+
   {
-    "label": "Build",
-    "command": "cmake --build --preset debug",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "label": "Build (Debug)",
+    "command": "cmake --preset debug && cmake --build --preset debug -j$(nproc 2>/dev/null || echo 4)",
+    "tags": ["build"],
+    "reveal": "always"
   },
   {
-    "label": "Flash DAPLink",
-    "command": "openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "shell": "system",
+    "label": "Build (Release)",
+    "command": "cmake --preset release && cmake --build --preset release -j$(nproc 2>/dev/null || echo 4)",
+    "tags": ["build"],
+    "reveal": "always"
   },
   {
-    "label": "Build + Flash DAPLink",
-    "command": "sh -c 'cmake --build --preset debug && openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "label": "Flash (Debug)",
+    "command": "probe-rs download --speed 4000 --protocol swd --chip STM32F429ZI --verify build/debug/gd32f470_template.elf && probe-rs reset --speed 4000 --protocol swd --chip STM32F429ZI",
+    "tags": ["flash"],
+    "reveal": "always"
   },
   {
-    "label": "Flash JLink",
-    "command": "openocd -f openocd/interface-jlink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "shell": "system",
+    "label": "Build + Flash (Debug)",
+    "command": "cmake --preset debug && cmake --build --preset debug -j$(nproc 2>/dev/null || echo 4) && probe-rs download --speed 4000 --protocol swd --chip STM32F429ZI --verify build/debug/gd32f470_template.elf && probe-rs reset --speed 4000 --protocol swd --chip STM32F429ZI",
+    "tags": ["build", "flash"],
+    "reveal": "always"
   },
   {
-    "label": "Build + Flash JLink",
-    "command": "sh -c 'cmake --build --preset debug && openocd -f openocd/interface-jlink.cfg -f openocd/target-gd32f4xx.cfg -c \"program build/debug/gd32f470_template.elf verify reset exit\"'",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "label": "Build + Flash (Release)",
+    "command": "cmake --preset release && cmake --build --preset release -j$(nproc 2>/dev/null || echo 4) && probe-rs download --speed 4000 --protocol swd --chip STM32F429ZI --verify build/release/gd32f470_template.elf && probe-rs reset --speed 4000 --protocol swd --chip STM32F429ZI",
+    "tags": ["release", "flash"],
+    "reveal": "always"
   },
   {
     "label": "Clean Build",
-    "command": "sh -c 'rm -rf build && cmake --preset debug'",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "command": "rm -rf build",
+    "tags": ["clean"],
+    "reveal": "always"
   },
   {
-    "label": "OpenOCD Server",
-    "command": "openocd -f openocd/interface-daplink.cfg -f openocd/target-gd32f4xx.cfg",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true,
+    "label": "Erase Chip",
+    "command": "probe-rs erase --connect-under-reset --protocol swd --chip STM32F429ZI && probe-rs reset --speed 4000 --protocol swd --chip STM32F429ZI",
+    "tags": ["flash"],
+    "reveal": "always"
   },
   {
-    "label": "GDB",
-    "command": "arm-none-eabi-gdb build/debug/gd32f470_template.elf -ex \"target remote localhost:3333\" -ex \"monitor reset halt\" -ex \"load\" -ex \"break main\" -ex \"continue\"",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true,
+    "label": "Reset Target",
+    "command": "probe-rs reset --speed 4000 --protocol swd --chip STM32F429ZI",
+    "tags": ["flash"],
+    "reveal": "always"
   },
 ]

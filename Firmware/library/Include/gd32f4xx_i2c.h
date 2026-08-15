@@ -350,9 +350,9 @@ void i2c_enable(uint32_t i2c_periph);
 /* disable I2C */
 void i2c_disable(uint32_t i2c_periph);
 /* generate a START condition on I2C bus */
-void i2c_start_on_bus(uint32_t i2c_periph);
+void start_on_bus(uint32_t i2c_periph);
 /* generate a STOP condition on I2C bus */
-void i2c_stop_on_bus(uint32_t i2c_periph);
+void stop_on_bus(uint32_t i2c_periph);
 /* I2C transmit data function */
 void i2c_data_transmit(uint32_t i2c_periph, uint8_t data);
 /* I2C receive data function */

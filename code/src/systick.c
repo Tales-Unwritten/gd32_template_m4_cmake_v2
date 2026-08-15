@@ -35,7 +35,7 @@ OF SUCH DAMAGE.
 #include "gd32f4xx.h"
 #include "systick.h"
 
-static volatile uint32_t delay;
+static volatile uint32_t tick;   /* 1kHz 毫秒计数器，SysTick_Handler 中递增 */
 
 /*!
     \brief    configure systick
@@ -69,9 +69,12 @@ void delay_us(uint32_t us)
 
 }
 
-void delay_decrement(void)
+void tick_increment(void)
 {
-    if(0U != delay) {
-        delay--;
-    }
+    tick++;
+}
+
+uint32_t get_tick(void)
+{
+    return tick;
 }

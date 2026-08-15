@@ -111,13 +111,13 @@ void i2c_hw_port::deinit()
 //  互斥
 // ============================================================
 
-void i2c_hw_port::i2c_lock()
+void i2c_hw_port::lock()
 {
     while (_busy);
     _busy = 1;
 }
 
-void i2c_hw_port::i2c_unlock()
+void i2c_hw_port::unlock()
 {
     _busy = 0;
 }
@@ -138,7 +138,7 @@ void i2c_hw_port::_wait_flag(i2c_flag_enum flag)
 //  总线控制（GD32 寄存器级实现）
 // ============================================================
 
-void i2c_hw_port::i2c_start()
+void i2c_hw_port::start()
 {
     // 等待总线空闲
     uint32_t timeout = 0xFFFF;
@@ -146,20 +146,20 @@ void i2c_hw_port::i2c_start()
         if (--timeout == 0) return;
     }
     // 生成 START（或重复 START）
-    i2c_start_on_bus(_periph);
+    start_on_bus(_periph);
     _wait_flag(I2C_FLAG_SBSEND);
 }
 
 void i2c_hw_port::i2c_restart()
 {
     // 重复 START：总线已被本主机占有，直接发 START
-    i2c_start_on_bus(_periph);
+    start_on_bus(_periph);
     _wait_flag(I2C_FLAG_SBSEND);
 }
 
-void i2c_hw_port::i2c_stop()
+void i2c_hw_port::stop()
 {
-    i2c_stop_on_bus(_periph);
+    stop_on_bus(_periph);
     // 等待 STOP 条件已发送完成标志
     uint32_t timeout = 0xFFFF;
     while (!i2c_flag_get(_periph, I2C_FLAG_STPDET)) {
@@ -168,19 +168,19 @@ void i2c_hw_port::i2c_stop()
     i2c_flag_clear(_periph, I2C_FLAG_STPDET);
 }
 
-void i2c_hw_port::i2c_write_byte(uint8_t data)
+void i2c_hw_port::write_byte(uint8_t data)
 {
     _wait_flag(I2C_FLAG_TBE);
     i2c_data_transmit(_periph, data);
 }
 
-uint8_t i2c_hw_port::i2c_read_byte()
+uint8_t i2c_hw_port::read_byte()
 {
     _wait_flag(I2C_FLAG_RBNE);
     return i2c_data_receive(_periph);
 }
 
-bool i2c_hw_port::i2c_wait_ack(uint16_t timeout)
+bool i2c_hw_port::wait_ack(uint16_t timeout)
 {
     // 等待 ADDSEND 或超时（主设备地址发送后从机应答）
     while (!i2c_flag_get(_periph, I2C_FLAG_ADDSEND)) {
@@ -190,7 +190,7 @@ bool i2c_hw_port::i2c_wait_ack(uint16_t timeout)
     return true;
 }
 
-void i2c_hw_port::i2c_write_ack(uint8_t ack)
+void i2c_hw_port::write_ack(uint8_t ack)
 {
     i2c_ack_config(_periph, ack ? I2C_ACK_DISABLE : I2C_ACK_ENABLE);
 }
@@ -202,16 +202,16 @@ void i2c_hw_port::i2c_write_ack(uint8_t ack)
 void i2c_hw_port::i2c_write_reg(uint8_t dev_addr_7bit, uint8_t reg,
                                  const uint8_t *data, uint16_t len)
 {
-    i2c_lock();
+    lock();
 
-    i2c_start();
-    i2c_write_byte(dev_addr_7bit << 1);   // 7-bit → 8-bit 写地址
-    if (!i2c_wait_ack()) goto exit;        // 地址阶段：等 ADDSEND
-    i2c_write_byte(reg);                   // 寄存器地址
+    start();
+    write_byte(dev_addr_7bit << 1);   // 7-bit → 8-bit 写地址
+    if (!wait_ack()) goto exit;        // 地址阶段：等 ADDSEND
+    write_byte(reg);                   // 寄存器地址
     // 数据字节后不等 ACK（ADDSEND 只在地址阶段有效）
 
     for (uint16_t i = 0; i < len; i++) {
-        i2c_write_byte(data[i]);
+        write_byte(data[i]);
         // 数据阶段 NACK 检测：从机不应答则中止
         if (i2c_flag_get(_periph, I2C_FLAG_AERR)) {
             i2c_flag_clear(_periph, I2C_FLAG_AERR);
@@ -220,8 +220,8 @@ void i2c_hw_port::i2c_write_reg(uint8_t dev_addr_7bit, uint8_t reg,
     }
 
 exit:
-    i2c_stop();
-    i2c_unlock();
+    stop();
+    unlock();
 }
 
 void i2c_hw_port::i2c_read_reg(uint8_t dev_addr_7bit, uint8_t reg,
@@ -230,28 +230,28 @@ void i2c_hw_port::i2c_read_reg(uint8_t dev_addr_7bit, uint8_t reg,
     uint8_t addr_w = dev_addr_7bit << 1;
     uint8_t addr_r = addr_w | 0x01;
 
-    i2c_lock();
+    lock();
 
     // 阶段 1：写寄存器地址
-    i2c_start();
-    i2c_write_byte(addr_w);
-    if (!i2c_wait_ack()) goto exit;    // 地址阶段：等 ADDSEND
-    i2c_write_byte(reg);               // 寄存器地址（数据阶段，不等 ACK）
+    start();
+    write_byte(addr_w);
+    if (!wait_ack()) goto exit;    // 地址阶段：等 ADDSEND
+    write_byte(reg);               // 寄存器地址（数据阶段，不等 ACK）
 
     // 阶段 2：重复 START + 读
     i2c_restart();
-    i2c_write_byte(addr_r);
-    if (!i2c_wait_ack()) goto exit;
+    write_byte(addr_r);
+    if (!wait_ack()) goto exit;
 
     // 读取数据（单字节提前 NACK）
-    if (len == 1) i2c_write_ack(1);
+    if (len == 1) write_ack(1);
     for (uint16_t i = 0; i < len; i++) {
-        if (i == len - 2) i2c_write_ack(1);
-        data[i] = i2c_read_byte();
+        if (i == len - 2) write_ack(1);
+        data[i] = read_byte();
     }
 
 exit:
-    i2c_stop();
-    i2c_write_ack(0);  // 恢复 ACK
-    i2c_unlock();
+    stop();
+    write_ack(0);  // 恢复 ACK
+    unlock();
 }
