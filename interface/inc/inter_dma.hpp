@@ -43,6 +43,8 @@ public:
     void set_width(uint32_t width);     // DMA_PERIPH_WIDTH_8/16/32BIT
     void set_direction(uint32_t dir);   // DMA_MEMORY_TO_MEMORY / PERIPH_TO_MEMORY / MEMORY_TO_PERIPH
     void set_increment(bool src_inc, bool dst_inc);
+    void set_circular(bool enable);     // 循环模式（ADC 连续采集等）
+    void set_subperipheral(uint32_t sub_periph);  // 外设请求源选择（dma_subperipheral_enum，如 ADC0=DMA0_CH0 SUBPERI4）
 
     // ── 传输控制 ──────────────────────────────────────
     void start(void *src, void *dst, uint32_t count);
@@ -61,6 +63,8 @@ private:
     uint32_t   _dir;
     bool       _src_inc;
     bool       _dst_inc;
+    bool       _circular;
+    uint32_t   _sub_periph;
 };
 
 #endif

@@ -17,7 +17,8 @@ dma_channel::dma_channel(const DmaConfig &cfg)
     : _cfg(cfg), _initialized(false), _periph(0),
       _width(DMA_PERIPH_WIDTH_8BIT),
       _dir(DMA_MEMORY_TO_MEMORY),
-      _src_inc(true), _dst_inc(true)
+      _src_inc(true), _dst_inc(true),
+      _circular(false), _sub_periph(0)
 {}
 
 dma_channel::~dma_channel() { deinit(); }
@@ -50,6 +51,8 @@ void dma_channel::deinit()
 void dma_channel::set_width(uint32_t width)   { _width = width; }
 void dma_channel::set_direction(uint32_t dir)  { _dir = dir; }
 void dma_channel::set_increment(bool s, bool d) { _src_inc = s; _dst_inc = d; }
+void dma_channel::set_circular(bool enable)    { _circular = enable; }
+void dma_channel::set_subperipheral(uint32_t sub_periph) { _sub_periph = sub_periph; }
 
 void dma_channel::start(void *src, void *dst, uint32_t count)
 {
@@ -64,7 +67,11 @@ void dma_channel::start(void *src, void *dst, uint32_t count)
     dma_cfg.periph_memory_width = _width;
     dma_cfg.number              = count;
     dma_cfg.priority            = _cfg.priority;
-    dma_cfg.circular_mode       = DMA_CIRCULAR_MODE_DISABLE;
+    dma_cfg.circular_mode       = _circular ? DMA_CIRCULAR_MODE_ENABLE : DMA_CIRCULAR_MODE_DISABLE;
+
+    // 外设请求源选择（如 GD32F470: ADC0 -> DMA1 CH0 SUBPERI0，官方例程映射）
+    if (_sub_periph != 0)
+        dma_channel_subperipheral_select(_periph, _to_ch(_cfg.channel), (dma_subperipheral_enum)_sub_periph);
 
     if (_dir == DMA_MEMORY_TO_MEMORY) {
         dma_cfg.periph_addr    = (uint32_t)src;

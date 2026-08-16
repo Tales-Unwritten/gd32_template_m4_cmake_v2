@@ -1,5 +1,122 @@
 # Changelog
 
+## 2026-08-17 — ADC 接口完善：DMA 模式 + 轮询扫描确定性（参考官方例程与师傅 adc_bsp.c）
+
+### 板载实测（GD32F470，ADC0 温度 CH16 + Vref CH17，全链路验证）
+
+```
+scan1-5: TEMP=1374~1376mV (37°C)  VREFINT=1186~1187mV   // 连续 5 次稳定
+read_raw: CH16=1704, CH17=1473                           // 单通道正确
+scan_raw: [0]=1705 (CH16), [1]=1471 (CH17)               // 硬件扫描交替正确
+DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持续刷新
+```
+
+### Fixed / Added（根因全部来自 GD32F470 与 STM32 的差异）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | **DMA 请求映射错误**：误用 GD32F407 的 ADC0→DMA0_CH0/SUBPERI4，DMA 配置全对但永远无请求 | GD32F450/470 映射为 **ADC0→DMA1_CH0/SUBPERI0**（官方例程 `ADC0_routine_sequence_with_DMA` + 师傅 DMA_BSP 双重印证）；ADC1→DMA1_CH2/SUBPERI1、ADC2→DMA1_CH1/SUBPERI2 |
+| 2 | **EOCM 位语义与 STM32 相反**：默认 EOCM=0 只在序列结束时置位 EOC，轮询扫描只能读到序列最后一个通道 | 轮询路径显式 EOCM=1（每次转换置位 EOC）；DMA 路径保持 EOCM=0（官方例程默认，请求在序列末发出） |
+| 3 | **ROVF 停滞**：EOCM=1/DMA 时启用溢出检测，残留转换无人读数据→ROVF 置位→ADC 转换停滞直到清除 | 排空逻辑：每次操作前清 ROVF + 排空在途 EOC |
+| 4 | 单次模式（CTN=0）软件触发只转换一次，不支持多通道序列 | 轮询扫描改为：连续模式触发 + 读满 channel_count 次 EOC + 立即关闭 |
+| 5 | 校准顺序（已有）：GD32F4xx 必须先 enable 再 calibrate | 保持 |
+| 6 | rank 0-based（已有）：`adc_routine_channel_config` rank 从 0 起 | 保持 |
+
+### 接口变更
+
+- `AdcPortConfig`：DMA 默认改为 `dma1/CH0/SUBPERI0`（ADC0），注释标明三 ADC 映射
+- `adc_port` 新增：`dma_start(buf, frames)` / `dma_done()` / `dma_stop()`（DMA 循环连续采集）
+- `inter_dma` 新增：`set_subperipheral()` / `set_circular()`；`dma_start` 内先 subperipheral 选择再使能通道
+- 轮询路径（read_raw/scan_raw）与 DMA 路径（dma_start/stop）自动切换 EOCM/CTN，互不干扰
+
+---
+
+## 2026-08-15 — CAN 1Mbps 极限速率双板实测
+
+- ✅ 双板 CAN1 NORMAL **1Mbps**（60MHz/12TQ = prescaler 5，整除零误差）
+- ✅ 20 秒双向各 40 帧，零丢失零错误（计数序列完整）
+- 当前测试固件波特率配置为 1Mbps（`founction.cpp` 的 `can_bus.baudrate`）
+
+---
+
+## 2026-08-15 — CAN 双板实测（CAN1 NORMAL 500k，发现并修复过滤器时钟域 bug）
+
+### Fixed（双板实测发现）
+
+- 🔴 **CAN1 过滤器时钟域 bug**：过滤器寄存器位于 CAN0 外设地址空间，
+  仅使能 RCU_CAN1 时过滤器配置写入无效（FW 恒 0，收不到任何帧）——
+  使用 CAN1 时必须同时使能 RCU_CAN0 + RCU_CAN1
+
+### 双板实测结果（两块 GD32F470 开发板，CAN1 @ PB12/RX PB13/TX，500kbps）
+
+- ✅ 双向通信：A→B 与 B→A 各 40 帧/20s，**零丢失零错误**（计数序列完整连续）
+- ✅ 总线 ACK 正常（NORMAL 模式发送全部 OK，无 FAIL）
+- ✅ 标准帧 ID=0x100/8B 收发数据完整
+- ✅ 两板独立计数互不干扰（验证帧来源正确）
+- ℹ️ NORMAL 模式下 GD32 不自接收（每板 RX = 对方帧数），符合预期
+
+### 说明
+
+- 测试固件（founction.cpp）当前为 CAN 专注模式：跳过 INA228/W25Q/EXTI/波特率自检
+  （`[[maybe_unused]]` 保留，恢复调用即可）；保留 init 后一行 DBG 诊断输出（FW/FCTL/FIFO）
+- 双板烧录：probe-rs `--probe 2e3c:5745-0:xxxx` 区分两块板
+
+---
+
+## 2026-08-15 — CAN 接口调通（修复波特率/过滤器等 5 处 bug，参考王海涛 can_bsp.c）
+
+### Fixed（调不通的根因）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | 🔴 16TQ 时 500k 需 prescaler=7.5 → 取整后实际 468.75k（-6.25% 超容限）| 默认 12TQ（BS1=8/BS2=3，采样点 75%），60MHz 下 125k/250k/500k/1M 全部整除；不能整除时 init 返回 false，可手动指定 prescaler（对齐师傅外部指定思路） |
+| 2 | 🔴 `filter_bank` 无默认值（聚合初始化随机值，过滤器号可能越界）| 全字段默认值（C++20 指定初始化友好） |
+| 3 | 🟡 `time_segment_1/2` 寄存器值 = TQ-1，直接强转会差 1TQ | 显式 `bs-1` 映射 |
+| 4 | 🟡 发送等待完成前未清 MTF 标志（残留标志假成功）| 发送前清标志再等待 |
+| 5 | 🟡 `auto_retrans=DISABLE`（师傅 ENABLE）| 改为 ENABLE |
+
+### Changed
+
+- `CanPortConfig` 增强：`bs1_tq/bs2_tq/prescaler`（0=自动）、全字段默认值
+- `init()` → bool（整除失败/参数非法返回 false）
+- GPIO 上拉 NONE（对齐 CAN 标准与参考实现）
+
+### 板载验证（LOOPBACK 自发自收，无需外部节点）
+
+- ✅ 500kbps 初始化成功（prescaler=10 整除）
+- ✅ 标准帧 0x123/8B：收发 ID/长度/数据全匹配
+- ✅ 扩展帧 0x1FFFFFFF/3B：收发匹配
+
+---
+
+## 2026-08-15 — EXTI 全 23 线支持（对齐参考实现 exti_bsp.c）
+
+### Changed（inter_exti 能力对齐）
+
+参考王海涛 exti_bsp.c（纯 C）对齐并增强：
+
+- **全 23 线覆盖**：GPIO 线 0~15 + 系统线 LVD(16) / USB_FS(18) / 以太网(19) / USB_HS(20) /
+  RTC 时间戳(21) / RTC 唤醒(22)，全部 ISR 内聚；RTC 闹钟(17) 由 inter_rtc 管理（避免重复定义）
+- **线路互斥**：`init()` 返回 bool，同线已有实例时失败（PA0/PB0 同为线 0 防覆盖）
+- **优先级可配**：`ExtiConfig.priority`（默认 5，0 为最高抢占级）
+- **软件触发**：`software_trigger()`（调试用，等价参考实现 Soft_Interrupt）
+- **上/下拉可配**：`ExtiConfig.pull`（按键场景）
+- **线类型**：`exti_line_id` 枚举（gpio/lvd/usb_fs/ethernet/usb_hs/rtc_timestamp/rtc_wakeup）
+- 非法端口 assert、`line()` 查询、init/enable 去重
+
+### 板载自测（软件触发，无需外部信号）
+
+- ✅ 线路互斥：PA0 注册成功、PB0（同线 0）注册失败
+- ✅ ISR 链路：software_trigger ×3 → 回调执行 3 次（标志检查/清除/分发正确）
+- ✅ LVD 系统线：配置成功
+
+### 兼容性
+
+- `init()` 返回类型 void → bool（无现有调用方，零适配成本）
+- 构造函数/回调/enable/disable 接口不变
+
+---
+
 ## 2026-08-15 — 软串口适配 usart_port 接口 + Modbus 板载验证
 
 ### Changed（inter_soft_uart 接口对齐 usart_port 标准）

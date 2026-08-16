@@ -24,15 +24,22 @@ enum class can_id : uint8_t { can0, can1 };
 // ============================================================
 
 struct CanPortConfig {
-    can_id   periph;       ///< 外设 ID
-    uint32_t tx_port;      ///< CAN TX GPIO 端口
-    uint32_t tx_pin;       ///< CAN TX 引脚掩码
-    uint32_t rx_port;      ///< CAN RX GPIO 端口
-    uint32_t rx_pin;       ///< CAN RX 引脚掩码
-    uint32_t af;           ///< 复用功能编号（CAN0/1 通常 AF9）
-    uint32_t baudrate;     ///< 波特率: 125000, 250000, 500000, 1000000
-    uint32_t mode;         ///< CAN_NORMAL_MODE / CAN_LOOPBACK_MODE / CAN_SILENT_MODE
-    uint8_t  filter_bank;  ///< 过滤器起始 bank（CAN0=0, CAN1=15）
+    can_id   periph       = can_id::can0;  ///< 外设 ID
+    uint32_t tx_port      = 0;             ///< CAN TX GPIO 端口
+    uint32_t tx_pin       = 0;             ///< CAN TX 引脚掩码
+    uint32_t rx_port      = 0;             ///< CAN RX GPIO 端口
+    uint32_t rx_pin       = 0;             ///< CAN RX 引脚掩码
+    uint32_t af           = GPIO_AF_9;     ///< 复用功能编号（CAN0/1 通常 AF9）
+    uint32_t baudrate     = 500000;        ///< 波特率: 125000, 250000, 500000, 1000000
+    uint32_t mode         = CAN_NORMAL_MODE;  ///< CAN_NORMAL_MODE / CAN_LOOPBACK_MODE / CAN_SILENT_MODE
+    uint8_t  filter_bank  = 0;             ///< 过滤器起始 bank（CAN0=0, CAN1=15）
+
+    // ── 时序参数（对齐参考实现 can_bsp.c：外部指定保证整除） ──
+    // 波特率 = PCLK1(60MHz) / prescaler / (1 + bs1_tq + bs2_tq)
+    // 默认 12TQ（采样点 75%）：125k→40, 250k→20, 500k→10, 1M→5，全部整除
+    uint8_t  bs1_tq       = 8;             ///< 时间段1 TQ 数（0 = 用默认 8）
+    uint8_t  bs2_tq       = 3;             ///< 时间段2 TQ 数（0 = 用默认 3）
+    uint8_t  prescaler    = 0;             ///< 0 = 自动计算（不整除时 init 返回 false）；非 0 = 手动指定（对齐师傅）
 };
 
 // ============================================================
@@ -64,7 +71,13 @@ public:
     can_port &operator=(const can_port &) = delete;
 
     // ── 生命周期 ──────────────────────────────────────────
-    void init();
+
+    /** @brief 初始化 CAN（幂等）
+     *  @return true = 成功；false = 波特率无法整除（prescaler 非整数）或参数非法
+     *  @note  波特率公式：PCLK1 / prescaler / (1+bs1+bs2)，
+     *         自动计算时要求整除，否则返回 false（可手动指定 prescaler）
+     */
+    bool init();
     void deinit();
     [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
 

@@ -1,12 +1,6 @@
 // ============================================================
 // @platform GD32F4xx（当前平台）
-//   移植到新 MCU 时，本文件需要完整重写，但公共接口签名不变。
-//   需要替换的映射：
-//     - 外设基址:   CAN0/CAN1 → 目标平台外设基址
-//     - 时钟使能:   rcu_periph_clock_enable(RCU_CANx)
-//     - 波特率:    can_frequency_set → 目标平台 CAN 时序 API
-//     - 帧结构:    can_trasnmit_message_struct → 目标平台 CAN 帧
-//     - GPIO 复用:  AF9 → 目标平台 CAN AF 编号
+//   参考实现：王海涛 can_bsp.c（时序参数外部指定保证整除）
 // ============================================================
 
 #include "inter_can.hpp"
@@ -39,23 +33,22 @@ can_port::~can_port()
 
 void can_port::_enable_clock()
 {
-    // [PORT] GD32 时钟映射
     if (_cfg.periph == can_id::can0) {
         rcu_periph_clock_enable(RCU_CAN0);
     } else {
+        // ⚠️ CAN1 的过滤器寄存器位于 CAN0 外设地址空间（共享过滤器），
+        //    必须同时使能 CAN0 时钟，否则过滤器配置写入无效（FW 恒 0）
+        rcu_periph_clock_enable(RCU_CAN0);
         rcu_periph_clock_enable(RCU_CAN1);
     }
 }
 
 // ============================================================
-//  CAN 外设时钟频率
+//  CAN 外设时钟频率（APB1，GD32F470 @240MHz = 60MHz）
 // ============================================================
 
 uint32_t can_port::_can_clock() const
 {
-    // [PORT] GD32: CAN 在 APB1 上
-    // APB1 时钟由系统时钟分频得出，GD32F450 通常为 PCLK1 = 60MHz
-    // 简化：假设 APB1 = SystemCoreClock / 4
     return rcu_clock_freq_get(CK_APB1);
 }
 
@@ -63,9 +56,15 @@ uint32_t can_port::_can_clock() const
 //  init
 // ============================================================
 
-void can_port::init()
+bool can_port::init()
 {
-    if (_initialized) return;
+    if (_initialized) return true;
+
+    // 参数校验
+    if (_cfg.tx_port == 0 || _cfg.tx_pin == 0 || _cfg.rx_port == 0 || _cfg.rx_pin == 0)
+        return false;
+    if (_cfg.baudrate == 0)
+        return false;
 
     // 外设基址
     if (_cfg.periph == can_id::can0) {
@@ -76,29 +75,48 @@ void can_port::init()
 
     _enable_clock();
 
-    // GPIO AF
-    _tx.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    // GPIO AF（CAN 引脚标准无上拉）
+    _tx.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     _tx.set_af(_cfg.af);
-    _rx.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _rx.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     _rx.set_af(_cfg.af);
+
+    // ── 时序参数（对齐参考实现：保证整除，波特率精确） ──
+    // 波特率 = PCLK1 / prescaler / (1 + bs1 + bs2)
+    // ⚠️ GD32 枚举值 = TQ 数 - 1（CAN_BT_BS1_8TQ == 0x07）
+    const uint8_t bs1 = (_cfg.bs1_tq == 0) ? 8 : _cfg.bs1_tq;
+    const uint8_t bs2 = (_cfg.bs2_tq == 0) ? 3 : _cfg.bs2_tq;
+    if (bs1 < 1 || bs1 > 16 || bs2 < 1 || bs2 > 8)
+        return false;
+    const uint32_t total_tq = (uint32_t)1 + bs1 + bs2;
+
+    uint32_t prescaler = _cfg.prescaler;
+    if (prescaler == 0)
+    {
+        // 自动计算：要求整除，否则返回 false（避免旧版 468.75k≠500k 的问题）
+        const uint64_t div = (uint64_t)_cfg.baudrate * total_tq;
+        if (div == 0) return false;
+        prescaler = (uint32_t)(_can_clock() / div);
+        if ((uint64_t)_can_clock() % div != 0)
+            return false;   // 无法整除：请手动指定 bs1/bs2/prescaler
+        if (prescaler == 0 || prescaler > 1024)
+            return false;
+    }
 
     // CAN 外设初始化
     can_parameter_struct can_cfg;
     can_struct_para_init(CAN_INIT_STRUCT, &can_cfg);
     can_cfg.working_mode       = _cfg.mode;
     can_cfg.resync_jump_width  = CAN_BT_SJW_1TQ;
-    can_cfg.time_segment_1     = CAN_BT_BS1_8TQ;
-    can_cfg.time_segment_2     = CAN_BT_BS2_7TQ;
+    can_cfg.time_segment_1     = (uint8_t)(bs1 - 1);   // 寄存器值 = TQ 数 - 1
+    can_cfg.time_segment_2     = (uint8_t)(bs2 - 1);   // 寄存器值 = TQ 数 - 1
     can_cfg.time_triggered     = DISABLE;
     can_cfg.auto_bus_off_recovery = ENABLE;
     can_cfg.auto_wake_up       = DISABLE;
-    can_cfg.auto_retrans        = DISABLE;
+    can_cfg.auto_retrans       = ENABLE;      // 对齐参考实现：总线错误自动重传
     can_cfg.rec_fifo_overwrite = DISABLE;
     can_cfg.trans_fifo_order   = DISABLE;
-    // 波特率 = CAN_CLK / prescaler / (1+TS1+TS2)
-    // 例如 60MHz / 6 / (1+11+8) = 500kbps
-    can_cfg.prescaler          = (_can_clock() + _cfg.baudrate * (1+8+7) / 2)
-                                 / (_cfg.baudrate * (1+8+7));
+    can_cfg.prescaler          = prescaler;
 
     // CAN1 必须分配过滤器 bank（必须在 can_init 之前）
     if (_cfg.periph == can_id::can1) {
@@ -107,7 +125,7 @@ void can_port::init()
 
     can_init(_periph, &can_cfg);
 
-    // 配置过滤器：接收所有帧 → FIFO0
+    // 配置过滤器：接收所有帧 → FIFO0（掩码全 0）
     can_filter_parameter_struct filter_cfg;
     can_struct_para_init(CAN_FILTER_STRUCT, &filter_cfg);
     filter_cfg.filter_number      = _cfg.filter_bank;
@@ -122,6 +140,7 @@ void can_port::init()
     can_filter_init(&filter_cfg);
 
     _initialized = true;
+    return true;
 }
 
 // ============================================================
@@ -170,7 +189,9 @@ bool can_port::send(uint32_t id, bool is_ext, const uint8_t *data, uint8_t len)
     while (can_message_transmit(_periph, &tx_msg) == CAN_TRANSMIT_NOMAILBOX) {
         if (--timeout == 0) return false;
     }
-    // 等待发送完成（MTF0/1/2）
+
+    // 先清发送完成标志，再等待真正完成（防止残留标志假成功）
+    CAN_TSTAT(_periph) = CAN_TSTAT_MTF0 | CAN_TSTAT_MTF1 | CAN_TSTAT_MTF2;
     timeout = 0xFFFF;
     while (!(CAN_TSTAT(_periph) & (CAN_TSTAT_MTF0 | CAN_TSTAT_MTF1 | CAN_TSTAT_MTF2))) {
         if (--timeout == 0) return false;
@@ -179,7 +200,7 @@ bool can_port::send(uint32_t id, bool is_ext, const uint8_t *data, uint8_t len)
 }
 
 // ============================================================
-//  接收
+//  接收（查询 FIFO0）
 // ============================================================
 
 bool can_port::rx_ready() const
