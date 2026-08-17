@@ -1,4 +1,5 @@
 #include "device_ina228.hpp"
+#include "device_w25q128.hpp"
 #include "device_serial.hpp"
 #include "founction.hpp"
 #include "inter_i2c_bus.hpp"
@@ -7,6 +8,7 @@
 #include "inter_exti.hpp"
 #include "inter_can.hpp"
 #include "inter_adc.hpp"
+#include "inter_spi.hpp"
 #include "inter_soft_spi.hpp"
 #include "inter_soft_uart.hpp"
 #include "inter_usart.hpp"
@@ -37,7 +39,7 @@ static const INA228::Config ina228_cfg = {
 INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40, ina228_cfg);
 
 /* ── CAN 总线（CAN1 @ PB12/RX PB13/TX，双板互联 NORMAL 模式） ── */
-static can_port can_bus({
+[[maybe_unused]] static can_port can_bus({
     .periph      = can_id::can1,
     .tx_port     = GPIOB, .tx_pin = GPIO_PIN_13,
     .rx_port     = GPIOB, .rx_pin = GPIO_PIN_12,
@@ -46,7 +48,7 @@ static can_port can_bus({
     .mode        = CAN_NORMAL_MODE,
     .filter_bank = 15,     // CAN1 标准起始 bank
 });
-static uint32_t s_can_tx_count = 0;
+[[maybe_unused]] static uint32_t s_can_tx_count = 0;
 
 io_ctrl led1(GPIOC, GPIO_PIN_4);
 io_ctrl led2(GPIOC, GPIO_PIN_5);
@@ -55,6 +57,7 @@ io_ctrl led3(GPIOA, GPIO_PIN_7);
 /* ── 初始化 ──────────────────────────────────────────── */
 [[maybe_unused]] static void ina228_selftest(void);   // 定义见下方（测试固件暂未调用）
 [[maybe_unused]] static void w25q64_selftest(void);   // 定义见下方
+[[maybe_unused]] static void w25q128_hw_selftest(void); // 定义见下方
 [[maybe_unused]] static void exti_selftest(void);     // 定义见下方
 [[maybe_unused]] static void adc_selftest(void);      // 定义见下方
 [[maybe_unused]] static void suart_baud_test(void);   // 定义见下方
@@ -71,19 +74,21 @@ void function_init(void)
     led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     // Protocol_Init();
 
-    bool ok = can_bus.init();
-    char buf[64];
-    int len = snprintf(buf, sizeof(buf), "\r\n[CAN1] NORMAL dual-board test init=%d (1Mbps, PB12/13)\r\n", ok);
-    (void)suart.send_data((const uint8_t *)buf, len);
-    // 诊断：过滤器使能位全值 + FIFO0 长度
-    len = snprintf(buf, sizeof(buf), "[CAN] DBG FW=0x%08lX FCTL=0x%08lX FIFO0=%lu\r\n",
-                   (unsigned long)CAN_FW(CAN0),
-                   (unsigned long)CAN_FCTL(CAN0),
-                   (unsigned long)can_receive_message_length_get(CAN1, CAN_FIFO0));
-    (void)suart.send_data((const uint8_t *)buf, len);
-    adc_selftest();
-    if (!ok)
-        (void)suart.send_data((const uint8_t *)"[CAN1] init FAILED\r\n", 22);
+    // ⚠️ W25Q128 HW-SPI 验证：临时禁用双板 CAN 会话测试与 ADC 自检
+    // bool ok = can_bus.init();
+    // char buf[64];
+    // int len = snprintf(buf, sizeof(buf), "\r\n[CAN1] NORMAL dual-board test init=%d (1Mbps, PB12/13)\r\n", ok);
+    // (void)suart.send_data((const uint8_t *)buf, len);
+    // // 诊断：过滤器使能位全值 + FIFO0 长度
+    // len = snprintf(buf, sizeof(buf), "[CAN] DBG FW=0x%08lX FCTL=0x%08lX FIFO0=%lu\r\n",
+    //                (unsigned long)CAN_FW(CAN0),
+    //                (unsigned long)CAN_FCTL(CAN0),
+    //                (unsigned long)can_receive_message_length_get(CAN1, CAN_FIFO0));
+    // (void)suart.send_data((const uint8_t *)buf, len);
+    // if (!ok)
+    //     (void)suart.send_data((const uint8_t *)"[CAN1] init FAILED\r\n", 22);
+
+    w25q128_hw_selftest();
 }
 
 /* ── INA228 全功能自检（一次性，init() 后调用） ───────── */
@@ -302,42 +307,43 @@ void function_loop(void)
     // ── 软串口接收轮询 ──
     suart.poll();
 
+    // ⚠️ W25Q128 HW-SPI 验证：临时禁用 CAN 周期收发
     // ── CAN 周期发送（500ms，ID=0x100，数据=递增计数器） ──
-    static uint32_t s_last_tx = 0;
-    if (get_tick() - s_last_tx >= 500)
-    {
-        s_last_tx = get_tick();
-        s_can_tx_count++;
-
-        uint8_t data[8] = {
-            (uint8_t)(s_can_tx_count >> 24),
-            (uint8_t)(s_can_tx_count >> 16),
-            (uint8_t)(s_can_tx_count >> 8),
-            (uint8_t)(s_can_tx_count),
-            0, 0, 0, 0
-        };
-        bool ok = can_bus.send(0x100, false, data, 8);
-
-        char buf[64];
-        int len = snprintf(buf, sizeof(buf), "[CAN] TX id=0x100 cnt=%lu %s\r\n",
-                           (unsigned long)s_can_tx_count, ok ? "OK" : "FAIL");
-        (void)suart.send_data((const uint8_t *)buf, len);
-    }
-
-    // ── CAN 接收：打印所有收到的帧 ──
-    uint8_t  rx_data[8];
-    uint32_t rx_id;
-    bool     rx_ext;
-    uint8_t  rx_len;
-    while (can_bus.recv(rx_id, rx_ext, rx_data, rx_len))
-    {
-        char buf[64];
-        int len = snprintf(buf, sizeof(buf), "[CAN] RX id=0x%03lX len=%d %02X%02X%02X%02X %02X%02X%02X%02X\r\n",
-                           (unsigned long)rx_id, rx_len,
-                           rx_data[0], rx_data[1], rx_data[2], rx_data[3],
-                           rx_data[4], rx_data[5], rx_data[6], rx_data[7]);
-        (void)suart.send_data((const uint8_t *)buf, len);
-    }
+    // static uint32_t s_last_tx = 0;
+    // if (get_tick() - s_last_tx >= 500)
+    // {
+    //     s_last_tx = get_tick();
+    //     s_can_tx_count++;
+    //
+    //     uint8_t data[8] = {
+    //         (uint8_t)(s_can_tx_count >> 24),
+    //         (uint8_t)(s_can_tx_count >> 16),
+    //         (uint8_t)(s_can_tx_count >> 8),
+    //         (uint8_t)(s_can_tx_count),
+    //         0, 0, 0, 0
+    //     };
+    //     bool ok = can_bus.send(0x100, false, data, 8);
+    //
+    //     char buf[64];
+    //     int len = snprintf(buf, sizeof(buf), "[CAN] TX id=0x100 cnt=%lu %s\r\n",
+    //                        (unsigned long)s_can_tx_count, ok ? "OK" : "FAIL");
+    //     (void)suart.send_data((const uint8_t *)buf, len);
+    // }
+    //
+    // // ── CAN 接收：打印所有收到的帧 ──
+    // uint8_t  rx_data[8];
+    // uint32_t rx_id;
+    // bool     rx_ext;
+    // uint8_t  rx_len;
+    // while (can_bus.recv(rx_id, rx_ext, rx_data, rx_len))
+    // {
+    //     char buf[64];
+    //     int len = snprintf(buf, sizeof(buf), "[CAN] RX id=0x%03lX len=%d %02X%02X%02X%02X %02X%02X%02X%02X\r\n",
+    //                        (unsigned long)rx_id, rx_len,
+    //                        rx_data[0], rx_data[1], rx_data[2], rx_data[3],
+    //                        rx_data[4], rx_data[5], rx_data[6], rx_data[7]);
+    //     (void)suart.send_data((const uint8_t *)buf, len);
+    // }
 }
 
 /* ── W25Q64 软 SPI 测试（inter_soft_spi 实测） ───────────────── */
@@ -487,6 +493,96 @@ static void w25q64_selftest(void)
     len = snprintf(buf, sizeof(buf), "RESULT      : %s\r\n", pass ? "PASS" : "FAIL");
     tx(buf, len);
     txln("========== W25Q64 SOFT-SPI TEST DONE ==========\r\n");
+}
+
+/* ── W25Q128 硬件 SPI 验证（device 驱动 spi_port + w25q128 实测） ── */
+/* SPI4: CS=PF6, CLK=PF7, MISO=PF8, MOSI=PF9, AF5, MODE3, PSC2, MSB, 8bit
+   与旧 C 驱动 hard_w25q128 相同配置；软 SPI 测试为 MODE0（W25Q 两种模式均支持） */
+static spi_port w25q_hw_spi({
+    spi_id::spi4,
+    GPIOF, GPIO_PIN_7,        // SCK
+    GPIOF, GPIO_PIN_9,        // MOSI
+    GPIOF, GPIO_PIN_8,        // MISO
+    GPIOF, GPIO_PIN_6,        // CS
+    RESET,                    // CS 低有效
+    GPIO_AF_5,
+    SPI_PSC_2,
+    SPI_CK_PL_HIGH_PH_2EDGE,  // MODE3 (CPOL=1, CPHA=1)
+    SPI_ENDIAN_MSB,
+    SPI_FRAMESIZE_8BIT
+});
+static w25q128 w25q_dev(w25q_hw_spi);
+
+static void w25q128_hw_selftest(void)
+{
+    char buf[160];
+    int  len;
+
+    auto tx   = [&](const char *s, int n) { (void)suart.send_data((const uint8_t *)s, (uint16_t)n); };
+    auto txln = [&](const char *s) {
+        (void)suart.send_data((const uint8_t *)s, (uint16_t)strlen(s));
+        (void)suart.send_data((const uint8_t *)"\r\n", 2);
+    };
+
+    txln("\r\n========== W25Q128 HARDWARE-SPI TEST ==========");
+    w25q_hw_spi.init();
+    w25q_dev.init();
+
+    // 1. JEDEC ID（0x9F → EF 70 18 = W25Q128JV-IM；W25Q64 为 EF 40 17）
+    {
+        uint32_t id = w25q_dev.jedec_id();
+        len = snprintf(buf, sizeof(buf), "JEDEC ID    : %02X %02X %02X  (%s)\r\n",
+                       (uint8_t)(id >> 16), (uint8_t)(id >> 8), (uint8_t)(id & 0xFF),
+                       (id == 0xEF7018u) ? "W25Q128 OK" : "UNKNOWN");
+        tx(buf, len);
+    }
+
+    // 2. 状态寄存器（0x05）
+    {
+        uint8_t st = w25q_dev.read_status();
+        len = snprintf(buf, sizeof(buf), "Status Reg  : 0x%02X (WIP=%d)\r\n", st, st & 0x01);
+        tx(buf, len);
+    }
+
+    // 3. 读 0x000000 处 16 字节（芯片出厂默认 0xFF）
+    {
+        uint8_t rdata[16];
+        w25q_dev.read(0x000000, rdata, 16);
+        txln("Read 0x0000 : ");
+        for (int i = 0; i < 16; i++) { len = snprintf(buf, sizeof(buf), "%02X ", rdata[i]); tx(buf, len); }
+        txln("");
+    }
+
+    // 4. 擦写回环（最后扇区 0xFF0000，⚠️ 会擦除该扇区原有数据）
+    txln("-- Erase/Write/Readback @ 0xFF0000 --");
+    const uint8_t test_len = 32;
+    uint8_t pattern[32];
+    uint8_t rdata2[32];
+    for (int i = 0; i < test_len; i++) pattern[i] = (uint8_t)i;
+
+    w25q_dev.sector_erase(0xFF0000);
+    w25q_dev.write(0xFF0000, pattern, test_len);
+    w25q_dev.read(0xFF0000, rdata2, test_len);
+
+    bool match = true;
+    for (int i = 0; i < test_len; i++)
+        if (rdata2[i] != pattern[i]) { match = false; break; }
+
+    len = snprintf(buf, sizeof(buf), "Readback    : %s\r\n", match ? "MATCH (32B verified)" : "MISMATCH");
+    tx(buf, len);
+    if (!match)
+    {
+        txln("  written: ");
+        for (int i = 0; i < test_len; i++) { len = snprintf(buf, sizeof(buf), "%02X ", pattern[i]); tx(buf, len); }
+        txln("");
+        txln("  read:    ");
+        for (int i = 0; i < test_len; i++) { len = snprintf(buf, sizeof(buf), "%02X ", rdata2[i]); tx(buf, len); }
+        txln("");
+    }
+
+    len = snprintf(buf, sizeof(buf), "RESULT      : %s\r\n", match ? "PASS" : "FAIL");
+    tx(buf, len);
+    txln("========== W25Q128 HARDWARE-SPI TEST DONE ==========\r\n");
 }
 
 /* ── EXTI 自测（软件触发验证 ISR 链路 + 线路互斥 + 系统线） ── */

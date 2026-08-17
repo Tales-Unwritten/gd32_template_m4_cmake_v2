@@ -1,5 +1,146 @@
 # Changelog
 
+## 2026-08-17 — inter_adc 通道上限 8 → 16（对齐硬件规则组序列 + 参考实现）
+
+### Changed
+
+- `interface/inc/inter_adc.hpp`：新增 `ADC_CHANNEL_MAX = 16`，`channels[]` 数组与引脚存储由 8 扩至 16。
+  - 说明：GD32F470 的 16 个外部通道并非 PA0~PA15，而是 PA0~PA7 + PB0~PB1 + PC0~PC5；硬件规则组序列共 16 槽（RSQ0~RSQ3），参考实现 adc_bsp.h 亦声明 1~16，原 8 为软件保守限制。
+- `interface/src/inter_adc.cpp`：构造函数/init/deinit/scan_raw/dma_start/dma_stop 的通道上限统一改为 `ADC_CHANNEL_MAX`。
+
+## 2026-08-17 — inter_timer 易用性：频率自动计算 + 百分比占空比
+
+### Added
+
+- `interface/inc/inter_timer.hpp`：`TimerPortConfig` 新增 `frequency_hz` 字段——`>0` 时 init() 自动推导 prescaler/period（回写配置），`==0` 保持手动指定方式（向后兼容，聚合初始化顺序为 `periph, frequency_hz, prescaler, period, channels, channel_count`）。
+- `interface/src/inter_timer.cpp`：新增 `_timer_clock_hz()`（按 GD32F4xx 的 TIMERSEL + APBxPSC 规则推导定时器时钟，区别于 STM32 固定 2×APB）与 `_auto_calc()`（O(1) 求最小分频，period 尽量大以保证分辨率，区分 16 位/32 位计数器）。
+- `timer_port::pwm_set_duty_percent(channel, percent)`：百分比占空比 API（0.0~100.0，含边界钳位）。
+
+### Notes（宿主机算法验证）
+
+- 默认 240MHz 时钟下（AHB=240M, APB2=120M, APB1=60M）：APB1 定时器（TIMER1~6）时钟 = 2×60M = 120MHz，APB2 定时器（TIMER0/7）时钟 = AHB = 240MHz。
+- `_auto_calc` 验证：1Hz~500kHz 全频段误差 < 0.0015%（多数精确 0.0000%）；16 位定时器 period 不溢出；32 位定时器（TIMER1/4）全分辨率；目标频率高于时钟时安全退化（psc=0, period=1）。
+
+## 2026-08-17 — inter_timer 修复：timer5 IRQ 映射 / 高级定时器 MOE / DAC 共享 ISR
+
+### Fixed
+
+- `interface/src/inter_timer.cpp`：`_get_irq()` 的 timer5 映射原为 `#ifdef TIMER5_IRQn`，但 GD32F4xx 全系列无 `TIMER5_IRQn`（TIMER5 与 DAC 共享 `TIMER5_DAC_IRQn`），导致 `timer_id::timer5` 被错误指向 `TIMER6_IRQn`，且对应 `TIMER5_DAC_IRQHandler` 从未实现——一旦使用 timer5，中断落入默认 handler。
+  - 映射改为 `TIMER5_DAC_IRQn`（保留 `#ifdef` 保护 + `[PORT]` 注释）。
+  - 补实现 `TIMER5_DAC_IRQHandler`（DAC 欠载等共享事件通过 UP 标志判断后直接返回）。
+- `interface/src/inter_timer.cpp`：`init()` 对高级定时器（timer0/timer7）补调 `timer_primary_output_config(ENABLE)`。GD32 高级定时器主输出（CCHP.POEN/MOE）默认关闭，不使能则 PWM 引脚无输出；通用定时器无 CCHP 寄存器，故仅对 timer0/timer7 调用。
+
+## 2026-08-17 — Flash 布局重构（容量宏 + 扇区表）+ 板上实测确认
+
+### Fixed
+
+- `interface/src/inter_flash.cpp`：重新引入 `#include "gd32f4xx.h"`（位于 gd32f4xx_fmc.h 之前）。GD32 SDK 外设头无自带 `extern "C"` 保护，须借 gd32f4xx.h 的 extern "C" 块声明，否则 fmc_* 在 C++ 下被名字修饰导致链接失败（此前因 gc-sections 未暴露，首次实际调用即报错）。
+
+### Changed
+
+- `interface/inc/inter_flash.hpp`：新增 `FLASH_CAPACITY_KB` 容量宏（默认 2048，须与链接脚本 LENGTH 一致；支持 1024/2048/3072）。
+- `interface/src/inter_flash.cpp`：扇区布局改为**编译期表驱动**（每 1MB bank：4×16K+1×64K+7×128K；3MB 尾部追加 4×256K），`erase()` 查表取真实扇区边界 + `static_assert` 校验表总大小。
+  - 修复：旧公式把 bank1 起始（0x08100000~0x0811FFFF）的 16K/64K 扇区误判为 128K，导致安全区检查过度保守（合法擦除被拒）。
+- 修正 inter_flash.hpp 文档示例：安全区需覆盖整扇区（init(0x08020000, 0x20000)）。
+
+### Verified（板上实测，经用户同意在 bank1 0x08100000 做破坏性验证，验证后已擦除清理）
+
+```
+FLASH LAYOUT VERIFY (bank1 @ 0x08100000)
+0x08100000=0xFFFFFFFF  0x08104000=0x22222222  0x08110000=0x33333333
+VERDICT: 16K sector (per-bank layout: 4x16K+64K+7x128K)
+[REFACTOR] 16K-only safe-area erase: OK (table-driven)
+```
+
+- 结论 1：标记法证实 bank1 起始为 16K 扇区（每 1MB bank = 4×16K+1×64K+7×128K，与 STM32F429 兼容布局一致，亦与师傅扇区表吻合）。
+- 结论 2：重构后安全区仅覆盖单个 16K 扇区时擦除成功（旧公式会误判拒绝），表驱动修复生效。
+
+## 2026-08-17 — SPI 软/硬接口统一 + W25Q128 硬件 SPI 板上验证
+
+### Added
+
+- 新增抽象基类 `interface/inc/inter_spi_bus.hpp`（`spi_bus`）：软 SPI（`soft_spi_bus`）与硬件 SPI（`spi_port`）统一接口（init/deinit/transfer/transfer_byte/cs_select/cs_deselect），设备驱动可透明切换软/硬 SPI。
+
+### Changed
+
+- `inter_spi.hpp` / `inter_soft_spi.hpp`：`spi_port`、`soft_spi_bus` 均继承 `spi_bus`，公共方法标记 `override`。
+- SPI 设备驱动构造改为接收 `spi_bus&`（软/硬 SPI 通用）：w25q128 / max31855 / mcp23s17 / mcp_adc / mcp_dac / ms5611（`w25q128_flash` 因内部持有 `spi_port` 值成员保持不变）。
+- `user/src/founction.cpp`：新增 `w25q128_hw_selftest()`（SPI4 硬件 SPI：CS=PF6, CLK=PF7, MISO=PF8, MOSI=PF9, AF5, MODE3, PSC2, MSB, 8bit），临时注释双板 CAN 会话测试代码（保留可恢复）。
+
+### Verified（板上实测，DAP-Link 虚拟串口 /dev/ttyACM1，PA9/PA10 输出）
+
+```
+JEDEC ID    : EF 70 18  (W25Q128 OK)
+Status Reg  : 0x00 (WIP=0)
+-- Erase/Write/Readback @ 0xFF0000 --
+Readback    : MATCH (32B verified)
+RESULT      : PASS
+```
+
+注：/dev/ttyACM0 为另一块板（双板 CAN 测试对端）的串口，仍在输出旧 CAN 固件日志；本板串口为 /dev/ttyACM1。
+
+## 2026-08-17 — device 设备驱动 STM32→GD32 移植（SPI / GPIO 时序 / 串口 / 构建）
+
+### Changed
+
+- SPI 驱动移植（7 个）：max31855 / mcp23s17 / mcp_adc / mcp_dac / ms5611 / w25q128 / w25q128_flash
+  - `HAL_GetTick()` → `get_tick()`、`delay.hpp` → `systick.h`
+  - `w25q128_flash` 的 `SpiPortConfig` 常量映射为 GD32（`SPI_BAUDRATEPRESCALER_*`→`SPI_PSC_*`、`SPI_POLARITY_*|SPI_PHASE_*`→`SPI_CK_PL_*_PH_*`、`SPI_FIRSTBIT_MSB`→`SPI_ENDIAN_MSB`、`SPI_DATASIZE_*`→`SPI_FRAMESIZE_*`、`GPIO_AF0_SPI1`→`GPIO_AF_5`）
+- GPIO 位反转/时序驱动移植（15 个）：74hc138/74hc154/74hc590/hc4051/hc4052/hc4053/hc4067_gpio/shiftin/shiftout/x9c10x/dhtnew/drv8825/ds18b20/ds2401/hx711
+  - `io_ctrl::init()/reinit()` 由 STM32 三参 `(mode, pull, speed)` 改为 GD32 四参 `(mode, pull, otype, speed)`
+  - GPIO 常量映射：`GPIO_NOPULL/PULLUP/PULLDOWN`→`GPIO_PUPD_*`、`GPIO_SPEED_FREQ_*`→`GPIO_OSPEED_*`、`GPIO_PIN_RESET/SET`→`RESET/SET`
+- 串口驱动移植：mhzco2（`usart_port<256>` 模板 → `usart_port`；`HAL_GetTick()` → `get_tick()`）
+
+### Refactored
+
+- `CMakeLists.txt`：device 源文件由显式逐条列出改为 `file(GLOB ... CONFIGURE_DEPENDS)` 自动收录 `device/src/*.cpp`，新增驱动无需手动登记。
+
+## 2026-08-17 — device 设备驱动 STM32→GD32 移植（第二批 14 个器件）
+
+### Changed
+
+- 将 `#include "delay.hpp"` 改为 `#include "systick.h"`：ads1115 / as5600 / cht8305 / fram / gy521 / lcd1602
+- 将 `HAL_GetTick()` 替换为 `get_tick()`：abp2 / as5600 / asdx / bh1750 / cht8305 / gy521 / lcd1602
+- 新增 `#include "systick.h"`（原无 delay.hpp 但使用了 HAL_GetTick）：abp2 / asdx / bh1750
+- `delay_us()` / `delay_ms()` 保持不变
+- eeprom 的 WP 引脚初始化重写为 GD32 签名：
+  `init(GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_LOW)`
+  → `init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ)`
+
+### 涉及文件
+
+- device/src/device_abp2.cpp / inc/device_abp2.hpp
+- device/src/device_ads1115.cpp / inc/device_ads1115.hpp
+- device/src/device_as5600.cpp / inc/device_as5600.hpp
+- device/src/device_asdx.cpp / inc/device_asdx.hpp
+- device/src/device_bh1750.cpp
+- device/src/device_cht8305.cpp / inc/device_cht8305.hpp
+- device/src/device_eeprom.cpp
+- device/src/device_fram.cpp
+- device/src/device_gy521.cpp / inc/device_gy521.hpp
+- device/src/device_lcd1602.cpp
+
+其余 4 个驱动（24lc1025 / cat24m01 / ds3232 / hc4067）经检查已无 STM32 HAL / GPIO 常量残留，无需改动。
+
+## 2026-08-17 — device 设备驱动 STM32→GD32 移植（13 个 I2C 器件）
+
+### Changed
+
+- 将 `#include "delay.hpp"` 改为 `#include "systick.h"`（mcp4725 / mprls / sht31 / sht4x）
+- 将 `HAL_GetTick()` 替换为 `get_tick()`（mprls / rotarydecoder / sht31 / sht4x）
+- rotarydecoder 新增 `#include "systick.h"`（原无 delay.hpp 但使用了 HAL_GetTick）
+- `delay_ms()` 保持不变
+
+### 涉及文件
+
+- device/src/device_mcp4725.cpp
+- device/src/device_mprls.cpp
+- device/src/device_rotarydecoder.cpp
+- device/src/device_sht31.cpp
+- device/src/device_sht4x.cpp
+
+其余 8 个驱动（mcp23017 / mcp3424 / mcp9808 / pca9685 / pcf85263 / pcf8574 / pcf8591 / tca9548）经检查已无 STM32 HAL / GPIO 常量残留，无需改动。
+
 ## 2026-08-17 — ADC 接口完善：DMA 模式 + 轮询扫描确定性（参考官方例程与师傅 adc_bsp.c）
 
 ### 板载实测（GD32F470，ADC0 温度 CH16 + Vref CH17，全链路验证）

@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include "inter_io_ctrl.hpp"
+#include "inter_spi_bus.hpp"
 #include "gd32f4xx.h"       // [PORT] 替换为目标 SDK 头文件
 
 // ============================================================
@@ -76,7 +77,7 @@ struct SpiPortConfig {
  *   bus.transfer(tx, rx, len);
  *   bus.cs_deselect();
  */
-class spi_port {
+class spi_port : public spi_bus {
 public:
     explicit spi_port(const SpiPortConfig &cfg);
     ~spi_port();
@@ -85,8 +86,8 @@ public:
     spi_port &operator=(const spi_port &) = delete;
 
     // ── 生命周期 ──────────────────────────────────────────
-    void init();
-    void deinit();
+    void init() override;
+    void deinit() override;
     [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
 
     // ── 数据传输（阻塞、全双工） ──────────────────────────
@@ -98,18 +99,18 @@ public:
      * @param len 传输字节数
      * @note  tx 和 rx 可指向同一缓冲区（原地交换）
      */
-    void transfer(const uint8_t *tx, uint8_t *rx, uint16_t len);
+    void transfer(const uint8_t *tx, uint8_t *rx, uint16_t len) override;
 
     /** @brief 单字节全双工传输（发送 data，返回接收值） */
-    uint8_t transfer_byte(uint8_t data);
+    uint8_t transfer_byte(uint8_t data) override;
 
     // ── 片选控制 ──────────────────────────────────────────
 
     /** @brief 拉低/拉高 CS（取决于 cs_active_level 配置） */
-    void cs_select();
+    void cs_select() override;
 
     /** @brief 释放 CS（恢复到无效电平） */
-    void cs_deselect();
+    void cs_deselect() override;
 
     // ── 查询 ──────────────────────────────────────────────
 

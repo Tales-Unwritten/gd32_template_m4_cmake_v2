@@ -4,11 +4,68 @@
 
 #include "inter_flash.hpp"
 
+#include <array>
+
+// 必须先包含 gd32f4xx.h：其 extern "C" 块包裹 libopt 下所有外设声明，
+// 否则 gd32f4xx_fmc.h 的 fmc_* 函数在 C++ 下会被名字修饰导致链接失败
 #include "gd32f4xx.h"
 #include "gd32f4xx_fmc.h"
 
 uint32_t flash_port::_safe_start = 0;
 uint32_t flash_port::_safe_end   = 0;
+
+// ════════════════════════════════════════════════════════════
+//  GD32F4xx 扇区布局（板上实测确认，勿用统一公式替代）
+//    每个 1MB bank：4×16KB + 1×64KB + 7×128KB
+//    3MB 芯片：双 bank 之后追加 4×256KB
+//  容量由 FLASH_CAPACITY_KB（inter_flash.hpp）决定，编译期生成表
+// ════════════════════════════════════════════════════════════
+struct FmcSectorInfo { uint32_t base; uint32_t size; };
+
+static constexpr uint32_t kFlashBase   = 0x08000000u;
+static constexpr uint32_t kBankCount   = FLASH_CAPACITY_KB / 1024u;  // 1 / 2 / 3
+static constexpr uint32_t kBankSectors = 12;                          // 4×16K + 1×64K + 7×128K
+static constexpr uint32_t kSectorCount = (kBankCount >= 3)
+    ? (2 * kBankSectors + 4)                                          // 3MB：24 + 4×256K
+    : (kBankCount * kBankSectors);                                    // 1MB：12；2MB：24
+
+static constexpr std::array<FmcSectorInfo, kSectorCount> make_sector_table()
+{
+    std::array<FmcSectorInfo, kSectorCount> t{};
+    uint32_t base = kFlashBase;
+    uint32_t i = 0;
+    for (uint32_t b = 0; b < kBankCount && b < 2; b++) {
+        for (uint32_t s = 0; s < 4; s++) { t[i++] = {base, 16u * 1024};  base += 16u * 1024; }
+        t[i++] = {base, 64u * 1024}; base += 64u * 1024;
+        for (uint32_t s = 0; s < 7; s++) { t[i++] = {base, 128u * 1024}; base += 128u * 1024; }
+    }
+    if (kBankCount >= 3) {
+        for (uint32_t s = 0; s < 4; s++) { t[i++] = {base, 256u * 1024}; base += 256u * 1024; }
+    }
+    return t;
+}
+
+static constexpr std::array<FmcSectorInfo, kSectorCount> kSectors = make_sector_table();
+
+static_assert(FLASH_CAPACITY_KB == 1024 || FLASH_CAPACITY_KB == 2048 || FLASH_CAPACITY_KB == 3072,
+              "FLASH_CAPACITY_KB 仅支持 1024 / 2048 / 3072");
+
+static constexpr uint32_t table_total()
+{
+    uint32_t sum = 0;
+    for (const auto &s : kSectors) sum += s.size;
+    return sum;
+}
+static_assert(table_total() == FLASH_CAPACITY_KB * 1024u,
+              "扇区表总大小与 FLASH_CAPACITY_KB 不一致");
+
+static const FmcSectorInfo *find_sector(uint32_t addr)
+{
+    for (const auto &s : kSectors) {
+        if (addr >= s.base && addr < s.base + s.size) return &s;
+    }
+    return nullptr;
+}
 
 void flash_port::init(uint32_t safe_start, uint32_t safe_size)
 {
@@ -49,18 +106,14 @@ bool flash_port::_wait_busy()
 bool flash_port::erase(uint32_t addr)
 {
     // 扇区擦除会清除整个扇区，需确保整个扇区在安全区内
-    // GD32F470 扇区布局：
-    //   0x08000000~0x0800FFFF: 4×16KB  (Sector 0~3)
-    //   0x08010000~0x0801FFFF: 1×64KB  (Sector 4)
-    //   0x08020000~0x080FFFFF: 11×128KB (Sector 5~15)
-    uint32_t sector_end;
-    if (addr < 0x08010000)      sector_end = (addr & ~0x3FFF)  + 0x4000;
-    else if (addr < 0x08020000) sector_end = (addr & ~0xFFFF)  + 0x10000;
-    else                        sector_end = (addr & ~0x1FFFF) + 0x20000;
-    if (sector_end > _safe_end || addr < _safe_start) return false;
+    // 扇区边界查表（每 1MB bank：4×16K+64K+7×128K；3MB 尾部 4×256K），
+    // 避免按统一 128KB 计算导致 bank1 起始 16K/64K 扇区被误判
+    const FmcSectorInfo *sec = find_sector(addr);
+    if (sec == nullptr) return false;
+    if (sec->base < _safe_start || (sec->base + sec->size) > _safe_end) return false;
 
     fmc_flag_clear(FMC_FLAG_END | FMC_FLAG_OPERR | FMC_FLAG_WPERR
-                  | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
+                   | FMC_FLAG_PGMERR | FMC_FLAG_PGSERR);
 
     if (fmc_page_erase(addr) != FMC_READY) return false;
     return _wait_busy();

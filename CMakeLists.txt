@@ -95,6 +95,12 @@ set(SYSCALLS_FILE
 
 add_executable(${PROJECT_NAME}.elf)
 
+# device 设备驱动源文件：自动收录 device/src/ 下全部 .cpp
+# （新增驱动无需手动登记，重新 configure 即可）
+file(GLOB DEVICE_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/src/*.cpp
+)
+
 # ============================================================
 # Sources
 # ============================================================
@@ -154,13 +160,8 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     interface/src/inter_soft_spi.cpp   # 软件 SPI 总线（GPIO 位操作）
     interface/src/inter_soft_uart.cpp  # 软件串口（位反转 + DWT 时序）
 
-    # ── device 设备驱动 ────────────────────────────────
-    device/src/device_serial.cpp                  # 串口设备（debug/rs232/rs485 + DE）
-    device/src/device_ina226.cpp                  # INA226 电压/电流传感器
-    device/src/device_ina228.cpp                  # INA228 高精度传感器
-    device/src/device_ina219.cpp                  # INA219 电压/电流传感器
-    device/src/device_ina260.cpp                  # INA260 内置分流传感器
-    device/src/device_ina3221.cpp                 # INA3221 3 通道传感器
+    # ── device 设备驱动（自动 glob 收录）────────────────
+    ${DEVICE_SOURCES}
 
     # ── Modbus 协议栈 ───────────────────────────────
     protocol/modbus/src/modbus_crc.cpp         # CRC 校验

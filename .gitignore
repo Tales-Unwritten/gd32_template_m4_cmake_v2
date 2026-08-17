@@ -36,3 +36,6 @@ compile_commands.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Large reference docs (35MB PDF, not for VCS)
+file/*.pdf

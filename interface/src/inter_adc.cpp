@@ -15,7 +15,7 @@ adc_port::adc_port(const AdcPortConfig &cfg)
     : _cfg(cfg), _ch_pins{}, _dma(nullptr),
       _initialized(false), _periph(0)
 {
-    for (uint8_t i = 0; i < 8; i++) {
+    for (uint8_t i = 0; i < ADC_CHANNEL_MAX; i++) {
         if (i < cfg.channel_count && cfg.channels[i].port != 0) {
             _ch_pins[i] = new (_ch_storage[i].data)
                 io_ctrl(cfg.channels[i].port, cfg.channels[i].pin);
@@ -59,7 +59,7 @@ void adc_port::init()
     }
 
     // GPIO: 模拟模式
-    for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+    for (uint8_t i = 0; i < _cfg.channel_count && i < ADC_CHANNEL_MAX; i++) {
         if (_ch_pins[i] == nullptr && _cfg.channels[i].port != 0) {
             _ch_pins[i] = new (_ch_storage[i].data)
                 io_ctrl(_cfg.channels[i].port, _cfg.channels[i].pin);
@@ -85,7 +85,7 @@ void adc_port::init()
 
     // 硬件扫描：配置规则序列（rank 从 0 起，GD32 库按 rank 直接移位）
     if (_cfg.scan_enable && _cfg.channel_count > 0) {
-        for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+        for (uint8_t i = 0; i < _cfg.channel_count && i < ADC_CHANNEL_MAX; i++) {
             adc_routine_channel_config(_periph, i,            // ⚠️ rank 0-based
                                        _cfg.channels[i].channel,
                                        _cfg.channels[i].sample_time);
@@ -119,7 +119,7 @@ void adc_port::deinit()
         }
     }
 
-    for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+    for (uint8_t i = 0; i < _cfg.channel_count && i < ADC_CHANNEL_MAX; i++) {
         if (_ch_pins[i]) {
             _ch_pins[i]->deinit();
             _ch_pins[i]->~io_ctrl();
@@ -233,7 +233,7 @@ void adc_port::scan_raw(uint16_t *results)
 
     // 恢复完整扫描序列：read_raw() 会把序列长度改成 1，
     // 必须先按配置重排 rank + 长度，否则只转换最后一个通道
-    for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+    for (uint8_t i = 0; i < _cfg.channel_count && i < ADC_CHANNEL_MAX; i++) {
         adc_routine_channel_config(_periph, i,
                                    _cfg.channels[i].channel,
                                    _cfg.channels[i].sample_time);
@@ -302,7 +302,7 @@ bool adc_port::dma_start(uint16_t *buf, uint16_t frames)
     }
 
     // 恢复完整扫描序列（read_raw 会遗留长度=1，必须重排回全部通道）
-    for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+    for (uint8_t i = 0; i < _cfg.channel_count && i < ADC_CHANNEL_MAX; i++) {
         adc_routine_channel_config(_periph, i,
                                    _cfg.channels[i].channel,
                                    _cfg.channels[i].sample_time);
@@ -351,7 +351,7 @@ void adc_port::dma_stop()
     adc_special_function_config(_periph, ADC_CONTINUOUS_MODE, DISABLE);  // 退出连续，轮询路径确定性
     // 恢复完整扫描序列，供后续 scan_* 直接使用
     if (_cfg.scan_enable) {
-        for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
+        for (uint8_t i = 0; i < _cfg.channel_count && i < ADC_CHANNEL_MAX; i++) {
             adc_routine_channel_config(_periph, i,
                                        _cfg.channels[i].channel,
                                        _cfg.channels[i].sample_time);

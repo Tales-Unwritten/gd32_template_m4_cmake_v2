@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include "inter_io_ctrl.hpp"
+#include "inter_spi_bus.hpp"
 
 /**
  * @brief 软件 SPI 总线（GPIO 位操作模拟，阻塞全双工）
@@ -56,7 +57,7 @@ struct SoftSpiConfig
  *   // cs_port = 0；每设备各自持有 io_ctrl 片选：
  *   //   dev_a.cs_select();  bus.transfer(...);  dev_a.cs_deselect();
  */
-class soft_spi_bus
+class soft_spi_bus : public spi_bus
 {
 public:
     explicit soft_spi_bus(const SoftSpiConfig &cfg);
@@ -67,8 +68,8 @@ public:
 
     // ── 生命周期 ──────────────────────────────────────────
 
-    void init();                       // SCK/MOSI=推挽输出, MISO=输入, CS=输出(可选)
-    void deinit();                     // 全部恢复模拟输入，可再次 init()
+    void init() override;                       // SCK/MOSI=推挽输出, MISO=输入, CS=输出(可选)
+    void deinit() override;                     // 全部恢复模拟输入，可再次 init()
     [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
 
     // ── 数据传输（阻塞、全双工） ──────────────────────────
@@ -76,7 +77,7 @@ public:
     /**
      * @brief 单字节全双工传输（发送 data，返回接收值）
      */
-    uint8_t transfer_byte(uint8_t data);
+    uint8_t transfer_byte(uint8_t data) override;
 
     /**
      * @brief 多字节全双工传输（字节间 CS 不断开）
@@ -85,12 +86,12 @@ public:
      * @param len 传输字节数
      * @note  tx/rx 可指向同一缓冲区（原地交换）
      */
-    void transfer(const uint8_t *tx, uint8_t *rx, uint16_t len);
+    void transfer(const uint8_t *tx, uint8_t *rx, uint16_t len) override;
 
     // ── 片选（仅内部 CS 模式有效） ────────────────────────
 
-    void cs_select();                  // 按 cs_active_level 拉有效电平
-    void cs_deselect();                // 恢复无效电平
+    void cs_select() override;                  // 按 cs_active_level 拉有效电平
+    void cs_deselect() override;                // 恢复无效电平
 
     // ── 运行时配置 ────────────────────────────────────────
 

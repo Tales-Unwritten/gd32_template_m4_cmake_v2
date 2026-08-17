@@ -6,7 +6,15 @@
 #ifdef __cplusplus
 
 #include <cstdint>
-#include "gd32f4xx.h"
+
+/* ════ Flash 容量配置（必须与链接脚本 FLASH LENGTH 一致） ════
+ *   1024 = 1MB（单 bank，12 扇区）
+ *   2048 = 2MB（双 bank，24 扇区，当前板）
+ *   3072 = 3MB（双 bank + 尾部 4×256KB，28 扇区）
+ * 换芯片密度时修改此宏，并同步 gd32f4xxXx_flash.ld 的 LENGTH。 */
+#ifndef FLASH_CAPACITY_KB
+#define FLASH_CAPACITY_KB 2048
+#endif
 
 /**
  * @brief 内部 Flash 安全读写
@@ -16,9 +24,9 @@
  *
  * 使用示例：
  *   // 使用 Flash 尾部 16KB 作为数据存储区
- *   flash_port::init(0x08020000, 0x4000);   // 安全区：0x08020000~0x08023FFF
+ *   flash_port::init(0x08020000, 0x20000);  // 安全区：0x08020000~0x0803FFFF（整 128KB 扇区）
  *
- *   flash_port::erase(0x08020000);           // 擦除整个扇区
+ *   flash_port::erase(0x08020000);           // 擦除整个扇区（须整扇区在安全区内）
  *   flash_port::write(0x08020000, 0xA5);     // 写 byte
  *   uint8_t val = flash_port::read_byte(0x08020000);
  */
