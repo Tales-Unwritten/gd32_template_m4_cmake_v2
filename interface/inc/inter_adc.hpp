@@ -15,9 +15,6 @@
 
 enum class adc_id : uint8_t { adc0, adc1, adc2 };
 
-/** @brief 单 ADC 最大通道数（硬件规则组序列共 16 槽，另含 3 个内部通道） */
-inline constexpr uint8_t ADC_CHANNEL_MAX = 16;
-
 // ============================================================
 //  通道配置
 // ============================================================
@@ -42,8 +39,8 @@ struct AdcPortConfig {
     uint32_t          clock_div        = ADC_ADCCK_PCLK2_DIV4; ///< ADC 时钟分频（3 个 ADC 共享，默认 120M/4=30MHz）
     bool              scan_enable      = false;  ///< 硬件扫描模式（多通道一次序列转换，对齐参考实现）
     bool              enable_temp_vref = false;  ///< 使能温度传感器(CH16)/内部参考(CH17)通道
-    AdcChannelConfig  channels[ADC_CHANNEL_MAX] = {};  ///< 通道列表（port=0 结束）
-    uint8_t           channel_count    = 0;      ///< 1~16
+    AdcChannelConfig  channels[8]      = {};     ///< 通道列表（port=0 结束）
+    uint8_t           channel_count    = 0;      ///< 1~8
 
     // ── DMA 模式（对齐官方例程 ADC0_routine_sequence_with_DMA：连续转换 + DMA 循环搬运） ──
     // 注意: GD32F450/470 的 ADC DMA 请求映射与 GD32F407 不同（官方例程 + 师傅 DMA_BSP 双重印证）:
@@ -136,8 +133,8 @@ private:
     AdcPortConfig _cfg;
 
     // PWM 模式同款 aligned storage + placement new
-    struct { alignas(io_ctrl) uint8_t data[sizeof(io_ctrl)]; } _ch_storage[ADC_CHANNEL_MAX];
-    io_ctrl *_ch_pins[ADC_CHANNEL_MAX];
+    struct { alignas(io_ctrl) uint8_t data[sizeof(io_ctrl)]; } _ch_storage[8];
+    io_ctrl *_ch_pins[8];
 
     // DMA 通道（use_dma 时有效）
     struct { alignas(dma_channel) uint8_t data[sizeof(dma_channel)]; } _dma_storage;

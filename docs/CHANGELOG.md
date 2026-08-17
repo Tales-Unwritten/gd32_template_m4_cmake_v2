@@ -1,13 +1,5 @@
 # Changelog
 
-## 2026-08-17 — inter_adc 通道上限 8 → 16（对齐硬件规则组序列 + 参考实现）
-
-### Changed
-
-- `interface/inc/inter_adc.hpp`：新增 `ADC_CHANNEL_MAX = 16`，`channels[]` 数组与引脚存储由 8 扩至 16。
-  - 说明：GD32F470 的 16 个外部通道并非 PA0~PA15，而是 PA0~PA7 + PB0~PB1 + PC0~PC5；硬件规则组序列共 16 槽（RSQ0~RSQ3），参考实现 adc_bsp.h 亦声明 1~16，原 8 为软件保守限制。
-- `interface/src/inter_adc.cpp`：构造函数/init/deinit/scan_raw/dma_start/dma_stop 的通道上限统一改为 `ADC_CHANNEL_MAX`。
-
 ## 2026-08-17 — inter_timer 易用性：频率自动计算 + 百分比占空比
 
 ### Added
