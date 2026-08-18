@@ -16,6 +16,10 @@
 
 #include "device_ina228.hpp"
 
+#ifdef APP_IAP
+#include "iap_app.hpp"
+#endif
+
 /* ============================================================
  *  用户命令处理函数 —— 在此处添加/删除
  * ============================================================ */
@@ -117,6 +121,15 @@ static void cmd_all(const char *args, char *reply, size_t size) {
         INA228_2.readDiagAlertRaw());
 }
 
+#ifdef APP_IAP
+/* IAP：触发进入升级模式（写请求标志后复位，boot 接管） */
+static void cmd_iap_upgrade(const char *args, char *reply, size_t size) {
+    (void)args;
+    snprintf(reply, size, "iap_upgrade triggered, rebooting into bootloader...\r\n");
+    Iap_RequestUpgrade();
+}
+#endif
+
 /* ============================================================
  *  命令表 —— 在此处增删条目
  * ============================================================ */
@@ -134,6 +147,9 @@ const command_entry_t g_command_table[] = {
     { "ina228_alert",         cmd_alert         },
     { "ina228_clear_alert",   cmd_clear_alert   },
     { "ina228_all",           cmd_all           },
+#ifdef APP_IAP
+    { "iap_upgrade",          cmd_iap_upgrade   },
+#endif
 };
 
 const uint8_t g_command_count =

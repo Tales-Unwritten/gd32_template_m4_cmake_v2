@@ -17,20 +17,25 @@
 #include "string_pro.hpp"
 #include "str_cmd.hpp"
 #include "device_serial.hpp"
+#include "inter_soft_uart.hpp"
 #include <cstring>
 
 #if ACTIVE_PROTOCOL == PROTOCOL_STRING_CMD
 
-/* ── 端口表（与 Modbus 相同模式） ──────────────────────────── */
+/* ── 端口表（与 Modbus 相同模式） ────────────────────────────
+ * 当前数据通道为软串口 suart（PA9/PA10，与 boot 硬件 USART0 同引脚），
+ * 硬件 debug_uart 因同引脚冲突被禁用，故挂 suart 而非 debug_uart */
+
+extern soft_uart_port suart;   // 定义于 user/src/founction.cpp
 
 static void send_via_debug(const uint8_t *data, uint16_t len)
 {
-    (void)debug_uart.send_data(data, len);
+    (void)suart.send_data(data, len);
 }
 
 static const string_port_t string_ports[] =
     {
-        { debug_uart.buffer(), send_via_debug },
+        { suart.buffer(), send_via_debug },
         /* 新增串口在此追加：
         { rs485_uart.buffer(), send_via_rs485 },  */
     };

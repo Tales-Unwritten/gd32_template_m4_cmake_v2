@@ -34,7 +34,7 @@ extern "C" {
 
 /** @brief 当前活跃协议（修改此宏后重新编译即可切换） */
 #ifndef ACTIVE_PROTOCOL
-#define ACTIVE_PROTOCOL  PROTOCOL_MODBUS
+#define ACTIVE_PROTOCOL  PROTOCOL_STRING_CMD
 #endif
 
 /* ══════════════════════════════════════════════════════════

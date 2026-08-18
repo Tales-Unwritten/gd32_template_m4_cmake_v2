@@ -1,5 +1,167 @@
 # Changelog
 
+## 2026-08-18 — IAP 目录结构重构：boot / application / common 分层
+
+### Changed
+
+- `protocol/iap/` 按功能拆分（文件内容零改动，仅路径调整）：
+  - `boot/`（inc+src）：bootloader 私有——`iap_boot.*`（状态机/跳转）、`iap_proto.*`（升级协议）、`boot_main.cpp`（入口+异常处理）；
+  - `application/`（inc+src）：应用侧私有——`iap_app.*`（VTOR/上报/请求/状态提示）；
+  - `common/`（inc+src）：boot/app 共享——`iap_conf`（分区/协议常量）、`iap_image`（镜像头）、`iap_param`（参数区日志）、`iap_crc`（校验）；
+  - `ld/`、`tools/` 位置不变。
+- `protocol/iap/CMakeLists.txt`：include 路径与源路径同步更新（boot/src、application/src、common/src）。
+
+### Verified
+
+- 三 target 重新构建通过，体积与重构前完全一致（boot 18684B / app 23848B），无逻辑变化；裸跑版编译零影响。
+
+## 2026-08-18 — IAP 升级系统 M5：硬件实测通过（全链路验证 + 5 项缺陷修复）
+
+### Verified（DAP-Link + /dev/ttyACM0 + GD32F470ZI 实板）
+
+- Boot 启动 → 参数初始化（双扇区日志）→ 跳转 app 全链路正常；app 软串口（PA9/PA10）自检输出 PASS。
+- 升级模式双触发验证：PC13 按键进入 ✓、REQ_UPGRADE 命令标志进入 ✓（QUERY 应答正常）。
+- 完整升级流程：START（擦分区）→ 90×DATA 分包（逐包 ACK）→ END（全量 CRC32 校验）→ ACTIVATE，A↔B 双向升级均成功。
+- 确认窗口状态机：ACTIVATE→attempt 计数→app 上报 boot_ok→连续 3 次成功固化（state=IDLE）✓。
+- 严格回滚：注入"连续 2 次启动失败"场景，boot 自动将 active 回滚到旧槽（旧固件零写入）✓。
+
+### Fixed（实测发现 5 项）
+
+1. **boot 缺 SysTick/HardFault handler**：原在 app 文件 gd32f4xx_it.c，boot 未编入 → 向量表指向 Default_Handler，SysTick 中断死循环（PC 卡 0x08001230）。已在 `boot_main.cpp` 自行定义。
+2. **出厂烧录格式**：flash-iap 烧裸 bin，boot 镜像校验失败（分区首字是 MSP 非 magic）→ 烧录 target 改为烧升级包 `iap_gd32f470_app_*.bin`；app 链接基址 = 分区基址+0x40（分区存储格式=头部+固件），跳转/VTOR 相应 +64B。
+3. **USB CDC 拆包导致 IDLE 误判**：DAP-Link 虚拟串口每 64B 一个 USB 帧（帧间 ~1ms > 86us），长帧被 IDLE 拆成多段半帧全部丢弃（小帧正常、265B 帧必挂）。`Iap_Proto_Task` 改为**长度驱动判帧**（解析帧头 LEN，收满再处理，不依赖 IDLE）。
+4. **DATA 末包长度公式错误**：`image_len-64-seq×256` 重复扣除头部（头部仅在包 0）→ 修正为 `image_len-seq×256`。
+5. **ACTIVATE 后确认窗口被误清**：attempt_slot=0 不满足首启判定 `attempt_slot==active`，boot 误判"参数不一致"清除 PENDING → 修正为 ACTIVATE 时 attempt_slot 指向新槽。
+6. **FMC 擦除粒度错配**：`flash_port::erase` 误用 `fmc_page_erase`（仅擦 4KB 页），与扇区表（16K/64K/128K）粒度不符 → 目标分区有旧固件时同扇区残留导致 DATA 写入失败（ERR_BUSY）。改用 `fmc_sector_erase`。
+7. **FMC SN 编码非连续**：GD32F4xx 扇区号编码 bank1 = 0~11、bank2 = 16~27（扇区号+4，12~15 保留；依据 CTL_SECTOR_NUMBER_12=CTL_SN(16)）。传裸扇区号曾误擦 boot 区（9→SN1，已恢复），修复为 `sector_to_sn()` 映射。
+
+### Changed（字符串协议接入 + 固化提示）
+
+- `app/inc/protocol_conf.hpp`：`ACTIVE_PROTOCOL` 切回 `PROTOCOL_STRING_CMD`（ASCII 字符串指令）。
+- `user/src/founction.cpp`：恢复 `Protocol_Init()` 调用（协议栈此前被测试模式注释，导致串口命令无人解析）；`APP_IAP` 下启动打印 IAP 状态行。
+- `protocol/string/src/string_pro.cpp`：端口表改挂软串口 `suart`（硬件 debug_uart 同引脚冲突被禁用）。
+- `iap_app.cpp/hpp`：新增 `Iap_AppGetStatus()`——启动提示 `IAP: NEW firmware on slot B v1.0.0, confirming (x/3)`（确认窗口）/ `IAP: active slot B v1.0.0 (confirmed)`（固化生效）。
+- `interface/src/inter_flash.cpp`：新增 `diag_fail_addr/stage` 通用擦除诊断（0=无 1=查表 2=安全区 3=擦除 4=等待）。
+
+### Verified（实测闭环）
+
+- **字符串命令触发**：串口发 `iap_upgrade` → app 写 REQ_UPGRADE → 复位 → boot 升级模式（QUERY 确认）✓
+- **升级全流程**（B 分区含旧固件残留场景）：START 扇区擦除 → 94×DATA → END 全量校验 → ACTIVATE 全通 ✓
+- **确认窗口与固化提示**：`confirming (2/3)` → `(3/3)` → `(confirmed)` 串口实时可见 ✓
+- 裸跑版（无 APP_IAP）编译零影响。
+
+### Notes
+
+- `tests/iap_test.py`：IAP 协议验证工具（query / upgrade / 单命令），升级包自动分包+停等+重试。
+- 断电场景（传输中/擦除中/激活后掉电）逻辑已推演（S2/S13/S15/S20/S26），硬件断电实测留待用户环境操作。
+
+## 2026-08-18 — IAP 升级系统 M4：App 侧接入（VTOR / 上报 / 升级命令）
+
+### Added
+
+- `protocol/iap/inc/iap_app.hpp` + `src/iap_app.cpp`：
+  - `Iap_AppInit`：VTOR 重定位到分区基址（编译期宏 APP_SLOT_A/B）+ flash 安全区（仅参数区，app 无权碰固件区）+ 首次喂狗；
+  - `Iap_AppFeedWdt`：周期喂狗（boot 跳转前已使能 IWDG，app 接管喂狗职责）；
+  - `Iap_AppReportBootOk`：主循环首圈调用，仅 PENDING 确认窗口且本槽=active 时写 boot_ok（幂等）；
+  - `Iap_RequestUpgrade`：写 REQ_UPGRADE 标志后软复位，boot 进入升级模式。
+- `code/src/main.c`：`APP_IAP` 宏下 `Iap_AppInit()` 置于 main 第一行（先于 systick_config，VTOR 必须先于任何中断使能，否则中断落入 boot 向量表）。
+- `user/src/founction.cpp`：`APP_IAP` 宏下 init/loop 各加喂狗 + 首圈上报。
+- `protocol/modbus/src/modbus_map.cpp`：`Modbus_WriteRegister` 钩子——保持寄存器 0x000A（ControlBlock[0]，此前全块空闲）写 0x5AA5 触发升级。
+- `protocol/string/src/str_cmd.cpp`：命令表新增 `iap_upgrade`（`APP_IAP` 宏保护）。
+- IWDG 生命周期修正（硬件特性：系统复位不停止已使能的 IWDG）：boot 启动即喂狗，升级模式循环/双坏死等循环/分区擦除每扇区间歇喂狗，`Iap_Param_Write` 擦除前喂狗——避免 boot 自身升级流程（擦除 4-12s）被 6.5s IWDG 打断；跳转 app 后由 app 接管。
+- boot/app 构建：boot 源不变；app 源新增 iap_crc/iap_param/iap_app + fwdgt 库；bin 输出名修正（去掉 .elf 后缀，与烧录 target 一致）。
+
+### Verified
+
+- 三 target 链接通过：boot 18.5K/128K；app_a/app_b 各 22.9K/512K（4.37%）。
+- 裸跑版（debug，无 APP_IAP）编译通过，宏保护零影响。
+- 升级包 `iap_app_a.bin`/`iap_app_b.bin` 生成成功（v1.0.0，slot A/B）。
+
+### Pending（后续里程碑）
+
+- M5：硬件实测（boot 跳转、升级全流程、回滚、断电场景）。
+
+## 2026-08-18 — IAP 升级系统 M3：Boot 完整流程（协议 / 状态机 / 跳转）
+
+### Added
+
+- `protocol/iap/inc/iap_crc.hpp` + `src/iap_crc.cpp`：CRC16（Modbus 0xA001）+ CRC32 增量接口 `Iap_Crc32_Step`（与打包脚本 zlib.crc32 同源）；`iap_param.cpp` 改为复用该模块。
+- `protocol/iap/inc/iap_boot.hpp` + `src/iap_boot.cpp`：
+  - Boot 初始化：USART0(PA9/10, 115200-8N1)、PC13 按键（50ms 防抖、低有效）、flash 安全区 = AppA/AppB/Param0/Param1（不含 boot 自身，防误擦）；
+  - 启动状态机：读参数 → PENDING 判定（连续 3 次成功上报→固化；连续 2 次失败→回滚，回滚=改 active 标志，旧固件全程零写入）→ 升级入口（按键/app 请求）→ active 分区校验（magic/platform/slot/len + 全量 CRC32）→ 失败试另一槽（自救）→ 双坏死等升级；
+  - `Iap_JumpToApp`：关中断/停 SysTick/清 NVIC → 使能 IWDG（FWDGT_PSC_DIV64, 4095 ≈ 6.5s 兜底，跳转即死也能复位回 boot 触发回滚）→ 取分区向量表 MSP/PC 跳转。
+- `protocol/iap/inc/iap_proto.hpp` + `src/iap_proto.cpp`：
+  - 帧协议 `0xA5 0x5A + CMD + LEN + PAYLOAD + CRC16`，逐包停等 + 序号去重，坏帧静默丢弃；
+  - 命令：QUERY（状态+三版本）、START（擦全分区→记录传输状态）、DATA（长度严格匹配、包 0 镜像头一致性校验防错槽、写后 ACK 进度）、END（全量 CRC32）、ACTIVATE（切 active→复位）、ABORT、REBOOT；
+  - 擦写期间关中断 + 停等协议（擦 4-12s / 写包 ~ms 级，无数据流丢失风险）；`iap_ports[]` 端口表与 modbus/string 同构。
+- `iap_conf.hpp`：状态机新增 `REQ_UPGRADE`；确认/回滚阈值常量（3/2）。
+- `iap_param.hpp`：state 枚举调整（IDLE/REQ_UPGRADE/TRANSFERRING/PENDING_ACTIVATE）。
+- boot target 源列表：新增 fwdgt 库、systick、inter_io_ctrl/usart/flash/wdt、iap 四源文件。
+
+### Verified
+
+- boot 编译链接通过：18472B / 128KB（14.09%）；向量表 MSP=0x20001190、Reset_Handler=0x080011E9 落在 boot 分区；关键符号（Iap_Boot_Run/Iap_JumpToApp/Iap_Param_Write/USART0_IRQHandler）全部存在。
+- app_a/app_b 双镜像构建不受影响。
+- 修复：IWDG 预分频宏 GD32 命名为 `FWDGT_PSC_DIV64`（非 STM32 的 IWDG_PRESCALER_64）。
+
+### Pending（后续里程碑）
+
+- M4：app 侧接入（VTOR/上报/请求命令/IWDG 喂狗）。
+- M5：硬件实测（升级/回滚/断电场景）。
+
+## 2026-08-18 — IAP 升级系统 M2：参数区双扇区日志 + 镜像打包脚本
+
+### Added
+
+- `protocol/iap/src/iap_param.cpp`：参数区双扇区日志实现。
+  - 每扇区 128KB / 512B = 256 槽顺序写（seq 递增），写满/遇脏槽时擦另一扇区从槽 0 重写；
+  - 读取扫描两扇区取「seq 最大且 CRC16 有效」记录，半写记录自动跳过；
+  - 擦除频率降至每 30~40 次升级 1 次；写后读回验证；
+  - 自带 Modbus CRC16（0xA001 逐位实现，标准向量 `"123456789"→0x4B37` 已验证）。
+- `protocol/iap/inc/iap_param.hpp`：公开接口 `Iap_Param_Read()` / `Iap_Param_Write()`（写方自动递增 seq），注释更新为多槽描述。
+- `protocol/iap/tools/iap_pack.py`：升级包打包脚本——64B 头部（magic/version/platform/image_len/crc32/slot）+ 负载 4 字节对齐 + CRC32（zlib 标准）。
+- boot target 源列表加入 `iap_param.cpp`。
+
+### Verified
+
+- `iap_pack.py` 打包 `gd32f470_app_a.elf.bin` → `iap_app_a.bin`：解包校验 magic/version/platform/total/crc32/slot/对齐 全部通过（version 1.0.0，slot A，crc32=0x8EF3CFCD）。
+- boot 重新编译链接通过。
+
+### Pending（后续里程碑）
+
+- M3：boot 完整流程（升级协议/状态机/跳转）。
+- M4：app 侧接入（VTOR/上报/请求命令）。
+- M5：硬件实测（升级/回滚/断电场景）。
+
+## 2026-08-18 — IAP 升级系统 M1：分区配置 + 链接脚本 + 构建骨架
+
+### Added
+
+- `protocol/iap/` 新目录（inc/src/ld/tools），实现串口 IAP 升级（boot + A/B 双应用）。分区布局（GD32F470ZI 2MB）：
+  - Boot `0x08000000` 128K（S0~S4，仅 SWD 更新）；AppA `0x08020000` 512K；AppB `0x080A0000` 512K；
+  - Param0 `0x08120000` / Param1 `0x08140000` 各 128K（双扇区日志）；预留 `0x08160000` 起 640K。
+- `protocol/iap/inc/iap_conf.hpp`：分区地址/大小宏、槽位定义（APP_SLOT_A/B 编译期注入）、版本/平台标识（"GDF4"）、升级协议常量（帧头/命令码/应答码/超时）。
+- `protocol/iap/inc/iap_image.hpp`：64B 镜像头部结构（magic/版本/平台/总长/CRC32/slot/保留）。
+- `protocol/iap/inc/iap_param.hpp`：512B 参数记录结构（双扇区日志：seq/state/active/pending/attempt/success/boot_ok/镜像信息/CRC16）。
+- `protocol/iap/ld/`：boot.ld（0x08000000/128K）、app_a.ld（0x08020000/512K）、app_b.ld（0x080A0000/512K），自 Firmware 链接脚本复制修改，RAM 布局不变。
+- `protocol/iap/CMakeLists.txt`：三个独立 target——`gd32f470_boot.elf`（-Os 固定优化）、`gd32f470_app_a.elf`/`gd32f470_app_b.elf`（同一源码两次链接，宏 `APP_IAP`+`APP_SLOT_A/B`）；POST_BUILD 生成 bin；烧录 target `flash-iap-boot`/`flash-iap-app-a`/`flash-iap-app-b`/`flash-iap`（整片 boot+app_a）。
+- 根 `CMakeLists.txt`：新增 `option(BUILD_IAP OFF)`（默认关闭，不影响现有构建）+ `add_subdirectory(protocol/iap)`。
+- `CMakePresets.json`：新增 `iap` preset（Release + BUILD_IAP=ON，binaryDir build/iap）。
+- `protocol/iap/src/boot_main.cpp`：M1 占位入口（M3 填充完整 boot 流程）。
+
+### Verified
+
+- `cmake --preset iap` + 构建三个 target 通过：boot 1.3KB/128K、app_a/app_b 各 19.2KB/512K（3.67%）。
+- 向量表验证：app_a Reset_Handler=0x080202E1、app_b=0x080A02E1、boot=0x08000235，均落在各自分区内。
+- 现有 debug 构建重新配置 + 编译通过，行为零变化。
+
+### Pending（后续里程碑）
+
+- M2：参数区双扇区日志实现 + 镜像打包脚本 tools/iap_pack.py。
+- M3：boot 完整流程（升级协议/状态机/跳转）。
+- M4：app 侧接入（VTOR/上报/请求命令）。
+- M5：硬件实测（升级/回滚/断电场景）。
+
 ## 2026-08-17 — inter_timer 易用性：频率自动计算 + 百分比占空比
 
 ### Added

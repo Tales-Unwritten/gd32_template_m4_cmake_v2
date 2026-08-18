@@ -376,3 +376,16 @@ add_custom_target(gdb
 
     USES_TERMINAL
 )
+
+# ============================================================
+# IAP（可选）——默认关闭，不影响现有 debug/release 构建
+#
+#   开启方式：cmake --preset iap   （或 -DBUILD_IAP=ON）
+#   产物：gd32f470_boot / gd32f470_app_a / gd32f470_app_b
+# ============================================================
+
+option(BUILD_IAP "Build IAP bootloader and dual-app images" OFF)
+
+if(BUILD_IAP)
+    add_subdirectory(protocol/iap)
+endif()

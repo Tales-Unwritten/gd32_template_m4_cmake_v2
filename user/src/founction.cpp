@@ -16,6 +16,10 @@
 #include "protocol_conf.hpp"
 #include "systick.h"
 
+#ifdef APP_IAP
+#include "iap_app.hpp"
+#endif
+
 #include <cstdio>
 #include <cstring>
 
@@ -63,6 +67,10 @@ io_ctrl led3(GPIOA, GPIO_PIN_7);
 [[maybe_unused]] static void suart_baud_test(void);   // 定义见下方
 void function_init(void)
 {
+#ifdef APP_IAP
+    /* IAP：VTOR 已在 main() 设置；此处喂狗（boot 跳转前已使能 IWDG） */
+    Iap_AppFeedWdt();
+#endif
     // ⚠️ 测试模式：硬件 debug_uart 与软串口同引脚(PA9/10)，临时禁用硬件
     // DebugPort_Init();
     suart.init();
@@ -72,7 +80,14 @@ void function_init(void)
     led1.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     led2.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
     led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-    // Protocol_Init();
+    Protocol_Init();
+
+#ifdef APP_IAP
+    /* IAP 状态提示：激活确认进度 / 固化生效确认（升级后重启可见） */
+    char iap_status[96];
+    Iap_AppGetStatus(iap_status, sizeof(iap_status));
+    suart.send_data((const uint8_t *)iap_status, (uint16_t)strlen(iap_status));
+#endif
 
     // ⚠️ W25Q128 HW-SPI 验证：临时禁用双板 CAN 会话测试与 ADC 自检
     // bool ok = can_bus.init();
@@ -300,6 +315,11 @@ void UpdateModbusRegisters(void)
 /* ── 主循环 ──────────────────────────────────────────── */
 void function_loop(void)
 {
+#ifdef APP_IAP
+    /* IAP：周期喂狗 + 首圈上报 boot_ok（PENDING 确认窗口内） */
+    Iap_AppFeedWdt();
+    Iap_AppReportBootOk();
+#endif
     APP_PC_Task();
     led1.toggle();
     led2.toggle();

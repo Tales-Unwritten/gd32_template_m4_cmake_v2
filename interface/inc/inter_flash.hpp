@@ -80,6 +80,11 @@ private:
 
     static uint32_t _safe_start;
     static uint32_t _safe_end;
+
+public:
+    /* ── 调试诊断（最近一次失败原因；无失败时均为 0） ── */
+    static uint32_t diag_fail_addr;   /* 失败地址 */
+    static uint8_t  diag_fail_stage;  /* 0=无 1=查表 2=安全区 3=擦除 4=等待 */
 };
 
 #endif

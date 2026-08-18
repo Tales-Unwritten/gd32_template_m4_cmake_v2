@@ -31,6 +31,20 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+
+    {
+      "name": "iap",
+      "displayName": "IAP (boot + dual-app)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/iap",
+
+      "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_IAP": "ON"
+      }
     }
   ],
 
@@ -44,6 +58,12 @@
     {
       "name": "release",
       "configurePreset": "release",
+      "jobs": 16
+    },
+
+    {
+      "name": "iap",
+      "configurePreset": "iap",
       "jobs": 16
     }
   ]

@@ -1,5 +1,12 @@
 #include "modbus_map.hpp"
 
+#ifdef APP_IAP
+#include "iap_app.hpp"
+/* IAP 升级触发：保持寄存器 0x000A（ControlBlock[0]）写 0x5AA5 触发进入升级模式 */
+#define MODBUS_IAP_TRIGGER_ADDR    0x000A
+#define MODBUS_IAP_TRIGGER_VALUE   0x5AA5
+#endif
+
 /** 设备信息区： */
 uint16_t DeviceBlock[10] =
 {
@@ -93,9 +100,17 @@ void Modbus_WriteRegister(uint16_t addr, uint16_t value)
         {
             uint16_t index = addr - block->start_addr;
             block->data[index] = value;
-            return;
+            break;
         }
     }
+
+#ifdef APP_IAP
+    /* IAP 触发钩子：值已写入，主机可读回验证；触发后软复位进 boot 升级模式 */
+    if (addr == MODBUS_IAP_TRIGGER_ADDR && value == MODBUS_IAP_TRIGGER_VALUE)
+    {
+        Iap_RequestUpgrade();
+    }
+#endif
 }
 
 /* ============================================================
