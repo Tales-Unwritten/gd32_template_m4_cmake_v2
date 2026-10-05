@@ -10,14 +10,14 @@
  */
 struct UsartPortConfig
 {
-    uint32_t usart_periph;  ///< USART0 / USART1 / USART2 / UART3 / UART4 / USART5 / UART6 / UART7
-    uint32_t tx_port;       ///< TX GPIO 端口
-    uint32_t tx_pin;        ///< TX 引脚掩码
-    uint32_t rx_port;       ///< RX GPIO 端口
-    uint32_t rx_pin;        ///< RX 引脚掩码
-    uint32_t af;            ///< AF 复用编号
-    uint32_t baudrate;      ///< 波特率
-    uint16_t rx_buf_size;   ///< 接收缓冲区字节数
+    uint32_t usart_periph;      ///< USART0 / USART1 / USART2 / UART3 / UART4 / USART5 / UART6 / UART7
+    uint32_t tx_port;           ///< TX GPIO 端口
+    uint32_t tx_pin;            ///< TX 引脚掩码
+    uint32_t rx_port;           ///< RX GPIO 端口
+    uint32_t rx_pin;            ///< RX 引脚掩码
+    uint32_t af;                ///< AF 复用编号
+    uint32_t baudrate;          ///< 波特率
+    uint16_t rx_buf_size;       ///< 接收缓冲区字节数
 };
 
 /**
