@@ -12,14 +12,14 @@
  * ---------------------------------------------------------------------------
  */
 
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
-#include "semphr.h"
-#include "timers.h"
-#include "event_groups.h"
-#include "stream_buffer.h"
-#include "message_buffer.h"
+#include "FreeRTOS.h"        // FreeRTOS 核心头文件：配置、基础类型、宏定义，通常必须第一个包含
+#include "task.h"            // 任务管理：任务创建、删除、延时、调度等 API
+#include "queue.h"           // 队列：任务与任务/中断之间通信的基础机制
+#include "semphr.h"          // 信号量与互斥量：二值信号量、计数信号量、互斥量 API
+#include "timers.h"          // 软件定时器：定时器创建、启动、停止、复位等 API
+#include "event_groups.h"    // 事件组：多事件同步，按位设置和等待事件
+#include "stream_buffer.h"   // 流缓冲区：面向字节流的发送/接收，适合不定长数据
+#include "message_buffer.h"  // 消息缓冲区：基于流缓冲区，但带消息长度，适合离散消息
 
 /* 下面这些引用仅为「保证转到定义可跳转」而存在；
  * 本函数从不被调用，故编译后不产生任何代码。 */
@@ -468,3 +468,118 @@ ulTaskNotifyValueClearIndexed(0, 0, 0);
 (void) &xPortResetHeapMinimumEverFreeHeapSize;
 
 }
+
+// ============================================================================
+// FreeRTOS 常用 API 速查（按使用频率）
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. 任务与调度
+// ----------------------------------------------------------------------------
+// xTaskCreate()                                                         动态创建任务，自动分配栈和 TCB                    ★★★
+// vTaskDelay()                                                          相对延时，单位 tick，通常配合 pdMS_TO_TICKS(ms)  ★★★
+// xTaskDelayUntil() / vTaskDelayUntil()                                 固定周期延时，周期任务首选                        ★★
+// vTaskDelete()                                                         删除任务，传 NULL 删除当前任务                   ★★
+// vTaskStartScheduler()                                                 启动调度器，正常不返回                          ★★★
+// xTaskGetTickCount()                                                   获取当前 tick                            ★★
+// xTaskGetCurrentTaskHandle()                                           获取当前任务句柄                             ★★
+// vTaskSuspend() / vTaskResume()                                        挂起 / 恢复任务                            ★
+// vTaskPrioritySet() / uxTaskPriorityGet()                              设置 / 读取任务优先级                         ★
+// uxTaskGetStackHighWaterMark()                                         查看任务栈历史最小剩余，调试常用                     ★★
+
+// ----------------------------------------------------------------------------
+// 2. 临界区与调度器控制
+// ----------------------------------------------------------------------------
+// taskENTER_CRITICAL() / taskEXIT_CRITICAL()                            进入 / 退出临界区，保护短小关键代码                  ★★★
+// vTaskSuspendAll() / xTaskResumeAll()                                  挂起 / 恢复调度器，可嵌套，不关中断                  ★★
+// taskYIELD()                                                           主动请求任务切换                             ★★
+// portYIELD_FROM_ISR()                                                  ISR 中请求切换，常配合 FromISR 使用             ★★★
+
+// ----------------------------------------------------------------------------
+// 3. 队列
+// ----------------------------------------------------------------------------
+// xQueueCreate()                                                        动态创建队列                               ★★★
+// xQueueSend() / xQueueSendToBack()                                     从队尾入队                                ★★★
+// xQueueReceive()                                                       出队，读取并移除                             ★★★
+// xQueueSendFromISR()                                                   ISR 中入队                              ★★★
+// xQueueReceiveFromISR()                                                ISR 中出队                              ★★
+// uxQueueMessagesWaiting()                                              当前队列消息数                              ★★
+// xQueueReset()                                                         清空队列                                 ★
+// xQueuePeek()                                                          读取但不移除                               ★
+
+// ----------------------------------------------------------------------------
+// 4. 信号量 / 互斥量
+// ----------------------------------------------------------------------------
+// xSemaphoreCreateBinary()                                              创建二值信号量，初始为空，需先 Give                 ★★★
+// xSemaphoreCreateCounting()                                            创建计数信号量                              ★★
+// xSemaphoreCreateMutex()                                               创建互斥量，带优先级继承，保护共享资源                  ★★★
+// xSemaphoreTake()                                                      获取信号量 / 互斥量，带超时                      ★★★
+// xSemaphoreGive()                                                      释放信号量 / 互斥量                          ★★★
+// xSemaphoreGiveFromISR()                                               ISR 中释放信号量                           ★★★
+// xSemaphoreTakeFromISR()                                               ISR 中获取信号量                           ★★
+// xSemaphoreCreateRecursiveMutex() / TakeRecursive() / GiveRecursive()  递归互斥量，同任务可多次获取                       ★
+
+// ----------------------------------------------------------------------------
+// 5. 事件组
+// ----------------------------------------------------------------------------
+// xEventGroupCreate()                                                   动态创建事件组                              ★★★
+// xEventGroupSetBits()                                                  置位事件位                                ★★★
+// xEventGroupWaitBits()                                                 等待一个或多个事件位满足                         ★★★
+// xEventGroupClearBits()                                                清除事件位                                ★★
+// xEventGroupSetBitsFromISR()                                           ISR 中置位，经守护任务                        ★★
+
+// ----------------------------------------------------------------------------
+// 6. 任务通知
+// ----------------------------------------------------------------------------
+// xTaskNotifyGive()                                                     轻量计数型通知，自增                           ★★★
+// ulTaskNotifyTake()                                                    接收计数型通知，可清零                          ★★★
+// vTaskNotifyGiveFromISR()                                              ISR 中轻量通知                            ★★★
+// xTaskNotify()                                                         发送通知，可覆盖 / 置位 / 自增                   ★★
+// xTaskNotifyWait()                                                     等待通知，可进出时清位                          ★★
+// xTaskNotifyFromISR()                                                  ISR 中发送通知                            ★★
+// xTaskNotifyStateClear()                                               清除“有通知待取”状态                          ★
+
+// ----------------------------------------------------------------------------
+// 7. 软件定时器
+// ----------------------------------------------------------------------------
+// xTimerCreate()                                                        动态创建软件定时器                            ★★★
+// xTimerStart()                                                         启动 / 重新开始计时                          ★★★
+// xTimerStop()                                                          停止定时器                                ★★
+// xTimerReset()                                                         复位，重新计时                              ★★
+// xTimerChangePeriod()                                                  修改周期                                 ★★
+// xTimerStartFromISR()                                                  ISR 中启动定时器                           ★★
+// pvTimerGetTimerID() / vTimerSetTimerID()                              读写定时器 ID                             ★★
+
+// ----------------------------------------------------------------------------
+// 8. 流缓冲 / 消息缓冲
+// ----------------------------------------------------------------------------
+// xMessageBufferCreate()                                                创建消息缓冲，适合变长消息                        ★★
+// xMessageBufferSend() / xMessageBufferReceive()                        发送 / 接收一条消息                          ★★
+// xStreamBufferCreate()                                                 创建字节流缓冲                              ★★
+// xStreamBufferSend() / xStreamBufferReceive()                          发送 / 接收字节流                           ★★
+
+// ----------------------------------------------------------------------------
+// 9. 内存管理
+// ----------------------------------------------------------------------------
+// pvPortMalloc()                                                        从 RTOS 堆分配内存                         ★★★
+// vPortFree()                                                           释放 RTOS 堆内存                          ★★★
+// xPortGetFreeHeapSize()                                                当前空闲堆大小                              ★★
+// xPortGetMinimumEverFreeHeapSize()                                     历史最小空闲堆，调试内存                         ★★
+
+// ----------------------------------------------------------------------------
+// 10. 常用宏
+// ----------------------------------------------------------------------------
+// pdMS_TO_TICKS(ms)                                                     毫秒转 tick，延时 / 超时常用
+// portMAX_DELAY                                                         永久等待
+// pdTRUE / pdFALSE                                                      布尔值
+// pdPASS / pdFAIL                                                       返回状态
+
+// ============================================================================
+// 快速上手顺序
+// ============================================================================
+// 任务：xTaskCreate() -> vTaskDelay() -> vTaskStartScheduler()
+// 队列：xQueueCreate() -> xQueueSend() -> xQueueReceive() -> xQueueSendFromISR()
+// 信号量：xSemaphoreCreateBinary() / xSemaphoreCreateMutex() -> xSemaphoreTake() -> xSemaphoreGive() -> xSemaphoreGiveFromISR()
+// 事件组 / 任务通知：xEventGroupSetBits() / xEventGroupWaitBits()；xTaskNotifyGive() / ulTaskNotifyTake() / vTaskNotifyGiveFromISR()
+// 定时器：xTimerCreate() -> xTimerStart() -> xTimerStop()
+// 内存与临界区：pvPortMalloc() / vPortFree()；taskENTER_CRITICAL() / taskEXIT_CRITICAL()

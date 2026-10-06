@@ -122,7 +122,7 @@ set(IAP_APP_SOURCES
     ${CMAKE_SOURCE_DIR}/app/src/pc_task.cpp
 
     # ── 用户应用 ──
-    ${CMAKE_SOURCE_DIR}/user/src/founction.cpp
+    ${CMAKE_SOURCE_DIR}/user/src/function.cpp
 
     # ── IAP 应用侧（application + common） ──
     ${CMAKE_CURRENT_SOURCE_DIR}/common/src/iap_crc.cpp

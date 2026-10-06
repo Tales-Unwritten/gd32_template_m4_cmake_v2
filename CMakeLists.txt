@@ -189,7 +189,7 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
     app/src/pc_task.cpp                 # 任务入口（薄调度）
 
     # ── 用户应用 ───────────────────────────────────
-    user/src/founction.cpp              # 主循环 / 初始化
+    user/src/function.cpp              # 主循环 / 初始化
 )
 
 # ============================================================

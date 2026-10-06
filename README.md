@@ -511,8 +511,8 @@ gd32_template_m4_cmake_v2/
 │       └── private.cpp           # 参数存储
 
 ├── user/                         # 用户应用层
-│   ├── inc/founction.hpp
-│   └── src/founction.cpp         # 主循环 + 硬件初始化
+│   ├── inc/function.hpp
+│   └── src/function.cpp         # 主循环 + 硬件初始化
 
 ├── tests/                        # 协议测试脚本
 │   ├── test_modbus.py            # Modbus RTU 全功能测试
@@ -559,7 +559,7 @@ gd32_template_m4_cmake_v2/
 
 ```
 ┌─────────────────────────────────────┐
-│         user/founction              │  ← 主循环 / 硬件初始化
+│         user/function              │  ← 主循环 / 硬件初始化
 └──────────────┬──────────────────────┘
                │
 ┌──────────────▼──────────────────────┐

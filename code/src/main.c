@@ -5,7 +5,7 @@
 #include "main.h"
 #include "rtos_conf.h"
 
-#include "founction.hpp"
+#include "function.hpp"
 
 #ifdef APP_IAP
 #include "iap_app.hpp"

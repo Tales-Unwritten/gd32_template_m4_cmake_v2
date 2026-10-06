@@ -1,7 +1,7 @@
 #include "device_ina228.hpp"
 #include "device_w25q128.hpp"
 #include "device_serial.hpp"
-#include "founction.hpp"
+#include "function.hpp"
 #include "inter_i2c_bus.hpp"
 #include "inter_i2c_dev.hpp"
 #include "inter_io_ctrl.hpp"

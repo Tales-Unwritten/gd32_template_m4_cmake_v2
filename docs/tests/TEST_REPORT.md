@@ -14,13 +14,13 @@
 | 器件 / 功能 | 接口 | 引脚 | 参数 | 代码位置 |
 |-------------|------|------|------|----------|
 | **DAP-Link 调试串口** | USART0 | **PA9=TX, PA10=RX** | 115200-8N1 | `device/src/device_serial.cpp`（`debug_uart`） |
-| **INA228**（电压/电流） | 软 I2C | **PE2=SCL, PE3=SDA** | addr `0x40`；**ALERT=PG14** | `user/src/founction.cpp`（`i2c_bus` / `INA228_2` / `ina228_cfg`） |
+| **INA228**（电压/电流） | 软 I2C | **PE2=SCL, PE3=SDA** | addr `0x40`；**ALERT=PG14** | `user/src/function.cpp`（`i2c_bus` / `INA228_2` / `ina228_cfg`） |
 | **AT24C02** EEPROM | I2C | **PB6=SCL, PB7=SDA** | 7-bit addr `0x50` | `docs/PINOUT.md`；驱动 `hardware/src/hard_eeprom.c`(`eeprom_config`) / `device/inc/device_eeprom.hpp` |
-| **W25Q128** SPI Flash | SPI4 | **PF6=CS, PF7=CLK, PF8=MISO, PF9=MOSI** | AF5；硬 SPI MODE3/PSC2；软 SPI MODE0 | `user/src/founction.cpp`（`w25q_spi` 软 / `w25q_hw_spi` 硬） |
+| **W25Q128** SPI Flash | SPI4 | **PF6=CS, PF7=CLK, PF8=MISO, PF9=MOSI** | AF5；硬 SPI MODE3/PSC2；软 SPI MODE0 | `user/src/function.cpp`（`w25q_spi` 软 / `w25q_hw_spi` 硬） |
 | RS485 | USART1 | PA2=TX, PA3=RX；**PG13=DE** | 115200-8N1 | `device/src/device_serial.cpp`（`rs485_uart`） |
 | RS232 | USART2 | PD5=TX, PD6=RX | 115200-8N1 | `device/src/device_serial.cpp`（`rs232_uart`） |
 | OLED | I2C | PC1=SCL, PC2=SDA | — | `docs/PINOUT.md` |
-| LED1 / LED2 / LED4 | GPIO | PC4 / PC5 / PA7 | 低电平亮 | `user/src/founction.cpp`（`led1/2/3`） |
+| LED1 / LED2 / LED4 | GPIO | PC4 / PC5 / PA7 | 低电平亮 | `user/src/function.cpp`（`led1/2/3`） |
 
 ### 当前测试固件状态（`function_init()`）
 

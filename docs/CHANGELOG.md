@@ -138,7 +138,7 @@
 
 - `interface/inc/inter_i2c_bus.hpp`：`I2C_Bus_Info_t` 新增 `clock_speed`（目标 SCL Hz，默认 400k）与 `sys_clk_hz`（系统主频 Hz，默认 240M，**不依赖 `SystemCoreClock` 符号**）；构造函数收敛为单参 `explicit inter_i2c_bus(const I2C_Bus_Info_t&)`（去掉 `delay_us`）；成员 `_delay_val` → `_delay_count`。
 - `interface/src/inter_i2c_bus.cpp`：半周期延时改为**按波特率反算忙等次数** `_delay_count = sys_clk_hz / (clock_speed * 2 * 每循环周期)`；`_delay()` 用 `volatile` 忙等（防 -O2 优化为空）；「每循环周期」默认 **DWT 上电自标定**，并保留**固定值分支注释备用**（无 DWT 的平台）。
-- 调用点 `user/src/founction.cpp`：`inter_i2c_bus i2c_bus({portE, portE, pin2, pin3});`（默认 400k@240MHz）。
+- 调用点 `user/src/function.cpp`：`inter_i2c_bus i2c_bus({portE, portE, pin2, pin3});`（默认 400k@240MHz）。
 
 ### Verified
 
@@ -147,7 +147,7 @@
 
 ### Notes
 
-- 方案：按目标速率反算循环次数（`*2` = 半周期，每循环周期折算）；上半层不受影响（device 层持抽象 `i2c_bus*`；`I2C_Bus_Info_t` 仅 `founction.cpp` 一处构造）。
+- 方案：按目标速率反算循环次数（`*2` = 半周期，每循环周期折算）；上半层不受影响（device 层持抽象 `i2c_bus*`；`I2C_Bus_Info_t` 仅 `function.cpp` 一处构造）。
 - `inter_i2c_test_simple.hpp`（死代码）中 `inter_i2c_bus _bus;` 本就不可编译，未处理。
 
 ## 2026-10-06 — 修复 delay_us/delay_ms 被 -O2 优化为空（软 I2C 读 INA228 错乱根因）
@@ -177,7 +177,7 @@
 
 ### Changed
 
-- `user/src/founction.cpp`：`function_init()` 启用 `i2c_bus.init()` 并在启动时调用 `ina228_selftest()`（I2C 上板验证；W25Q128 自检保留）。
+- `user/src/function.cpp`：`function_init()` 启用 `i2c_bus.init()` 并在启动时调用 `ina228_selftest()`（I2C 上板验证；W25Q128 自检保留）。
 
 ## 2026-10-06 — I2C 设备层抽象化（依赖倒置落地）
 
@@ -203,7 +203,7 @@
 
 - `interface/inc/inter_soft_spi.hpp`：新增 `soft_mode_enum_t`（`soft_mode_0..3`）与 `soft_order_enum_t`（`MSB`/`LSB`）；`SoftSpiConfig.mode`/`bit_order` 由 `uint8_t` 改为上述枚举；`set_mode()`/`set_bit_order()` 形参同步改枚举；私有成员 `_cs_active_level` 由 `bool` 改回 `polarity`。
 - `interface/src/inter_soft_spi.cpp`：构造 / `set_mode` / `set_bit_order` / `_transfer_byte_core` / `cs_select` / `cs_deselect` 适配枚举；CS 控制改用 `io_ctrl::write(polarity)`。
-- 调用点：`user/src/founction.cpp` 的 `w25q_spi` 位置化初始化 `0, 0, 0` → `soft_mode_0, MSB, 0`。
+- 调用点：`user/src/function.cpp` 的 `w25q_spi` 位置化初始化 `0, 0, 0` → `soft_mode_0, MSB, 0`。
 
 ### Verified
 
@@ -224,7 +224,7 @@
 - **UART**：`usart_port`、`soft_uart_port` 模板化为 `template <uint16_t RX_BUF_SIZE = 256> : public usart_port_base`；RX 缓冲由堆 `new[]` 改为编译期静态数组（**零堆分配**）；模板成员定义内联于头文件，ISR/`g_port_map` 保留在 `.cpp`。
 - `UsartPortConfig` 删除 `rx_buf_size` 字段（改由模板参数承载）。
 - `g_port_map` 改为 `usart_port_base*`，ISR 经基类虚接口分发；注册/注销改为非模板自由函数 `usart_port_register/unregister`。
-- 调用点更新：`device_serial.{hpp,cpp}`（`usart_port<256>`）、`device_mhzco2.{hpp,cpp}`（`usart_port_base&`）、`iap_boot.cpp`（`usart_port<512>`）、`modbus.cpp`/`string_pro.cpp`（`extern soft_uart_port<256>`）、`user/src/founction.cpp`（`soft_uart_port<256>`）。
+- 调用点更新：`device_serial.{hpp,cpp}`（`usart_port<256>`）、`device_mhzco2.{hpp,cpp}`（`usart_port_base&`）、`iap_boot.cpp`（`usart_port<512>`）、`modbus.cpp`/`string_pro.cpp`（`extern soft_uart_port<256>`）、`user/src/function.cpp`（`soft_uart_port<256>`）。
 
 ### Verified
 
@@ -252,7 +252,7 @@
   - `interface/src/` 11 个（init/reinit/set_af 参数、`read()` 与 `High`/`Low` 比较）；
   - `device/inc/` 15 个（INA 系列 + 74hc138/154/590、hc4051~4067_gpio、shiftin/shiftout、x9c10x）；
   - `device/src/` 15 个（INA 系列 + dhtnew/ds18b20/ds2401/hx711/mcp_dac/drv8825/serial/w25q128_flash/pca9685 等）；
-  - `user/src/founction.cpp`、`protocol/iap/boot/src/iap_boot.cpp` 的实例化/构造点。
+  - `user/src/function.cpp`、`protocol/iap/boot/src/iap_boot.cpp` 的实例化/构造点。
 - 未改动任何传给 GD32 SDK 函数的宏（`usart_*`/`spi_*`/`adc_*`/`syscfg_exti_line_config` 等仍用 SDK 宏）。
 
 ### Verified
@@ -319,7 +319,7 @@
 ### Changed（字符串协议接入 + 固化提示）
 
 - `app/inc/protocol_conf.hpp`：`ACTIVE_PROTOCOL` 切回 `PROTOCOL_STRING_CMD`（ASCII 字符串指令）。
-- `user/src/founction.cpp`：恢复 `Protocol_Init()` 调用（协议栈此前被测试模式注释，导致串口命令无人解析）；`APP_IAP` 下启动打印 IAP 状态行。
+- `user/src/function.cpp`：恢复 `Protocol_Init()` 调用（协议栈此前被测试模式注释，导致串口命令无人解析）；`APP_IAP` 下启动打印 IAP 状态行。
 - `protocol/string/src/string_pro.cpp`：端口表改挂软串口 `suart`（硬件 debug_uart 同引脚冲突被禁用）。
 - `iap_app.cpp/hpp`：新增 `Iap_AppGetStatus()`——启动提示 `IAP: NEW firmware on slot B v1.0.0, confirming (x/3)`（确认窗口）/ `IAP: active slot B v1.0.0 (confirmed)`（固化生效）。
 - `interface/src/inter_flash.cpp`：新增 `diag_fail_addr/stage` 通用擦除诊断（0=无 1=查表 2=安全区 3=擦除 4=等待）。
@@ -346,7 +346,7 @@
   - `Iap_AppReportBootOk`：主循环首圈调用，仅 PENDING 确认窗口且本槽=active 时写 boot_ok（幂等）；
   - `Iap_RequestUpgrade`：写 REQ_UPGRADE 标志后软复位，boot 进入升级模式。
 - `code/src/main.c`：`APP_IAP` 宏下 `Iap_AppInit()` 置于 main 第一行（先于 systick_config，VTOR 必须先于任何中断使能，否则中断落入 boot 向量表）。
-- `user/src/founction.cpp`：`APP_IAP` 宏下 init/loop 各加喂狗 + 首圈上报。
+- `user/src/function.cpp`：`APP_IAP` 宏下 init/loop 各加喂狗 + 首圈上报。
 - `protocol/modbus/src/modbus_map.cpp`：`Modbus_WriteRegister` 钩子——保持寄存器 0x000A（ControlBlock[0]，此前全块空闲）写 0x5AA5 触发升级。
 - `protocol/string/src/str_cmd.cpp`：命令表新增 `iap_upgrade`（`APP_IAP` 宏保护）。
 - IWDG 生命周期修正（硬件特性：系统复位不停止已使能的 IWDG）：boot 启动即喂狗，升级模式循环/双坏死等循环/分区擦除每扇区间歇喂狗，`Iap_Param_Write` 擦除前喂狗——避免 boot 自身升级流程（擦除 4-12s）被 6.5s IWDG 打断；跳转 app 后由 app 接管。
@@ -500,7 +500,7 @@ VERDICT: 16K sector (per-bank layout: 4x16K+64K+7x128K)
 
 - `inter_spi.hpp` / `inter_soft_spi.hpp`：`spi_port`、`soft_spi_bus` 均继承 `spi_bus`，公共方法标记 `override`。
 - SPI 设备驱动构造改为接收 `spi_bus&`（软/硬 SPI 通用）：w25q128 / max31855 / mcp23s17 / mcp_adc / mcp_dac / ms5611（`w25q128_flash` 因内部持有 `spi_port` 值成员保持不变）。
-- `user/src/founction.cpp`：新增 `w25q128_hw_selftest()`（SPI4 硬件 SPI：CS=PF6, CLK=PF7, MISO=PF8, MOSI=PF9, AF5, MODE3, PSC2, MSB, 8bit），临时注释双板 CAN 会话测试代码（保留可恢复）。
+- `user/src/function.cpp`：新增 `w25q128_hw_selftest()`（SPI4 硬件 SPI：CS=PF6, CLK=PF7, MISO=PF8, MOSI=PF9, AF5, MODE3, PSC2, MSB, 8bit），临时注释双板 CAN 会话测试代码（保留可恢复）。
 
 ### Verified（板上实测，DAP-Link 虚拟串口 /dev/ttyACM1，PA9/PA10 输出）
 
@@ -611,7 +611,7 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 
 - ✅ 双板 CAN1 NORMAL **1Mbps**（60MHz/12TQ = prescaler 5，整除零误差）
 - ✅ 20 秒双向各 40 帧，零丢失零错误（计数序列完整）
-- 当前测试固件波特率配置为 1Mbps（`founction.cpp` 的 `can_bus.baudrate`）
+- 当前测试固件波特率配置为 1Mbps（`function.cpp` 的 `can_bus.baudrate`）
 
 ---
 
@@ -633,7 +633,7 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 
 ### 说明
 
-- 测试固件（founction.cpp）当前为 CAN 专注模式：跳过 INA228/W25Q/EXTI/波特率自检
+- 测试固件（function.cpp）当前为 CAN 专注模式：跳过 INA228/W25Q/EXTI/波特率自检
   （`[[maybe_unused]]` 保留，恢复调用即可）；保留 init 后一行 DBG 诊断输出（FW/FCTL/FIFO）
 - 双板烧录：probe-rs `--probe 2e3c:5745-0:xxxx` 区分两块板
 
@@ -719,7 +719,7 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 
 - 软串口占用 PA9/PA10（与硬件 debug_uart 冲突），`DebugPort_Init()` 临时禁用
 - `ACTIVE_PROTOCOL` = PROTOCOL_MODBUS；Modbus 端口表挂软串口
-- 恢复硬件模式：`founction.cpp` 恢复 `DebugPort_Init()`、`protocol_conf.hpp` 恢复协议宏、
+- 恢复硬件模式：`function.cpp` 恢复 `DebugPort_Init()`、`protocol_conf.hpp` 恢复协议宏、
   `modbus.cpp` 端口表改回 debug_uart
 
 ---
@@ -855,7 +855,7 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 
 - `CMakeLists.txt`：`CMAKE_CXX_STANDARD` 17 → **20**，使能指定初始化（designated initializers），
   Config 结构体初始化可只写需要修改的字段，其余用默认值（与字段类型、字段位置无关）
-- `user/src/founction.cpp`：`ina228_cfg` 从全字段 20 行聚合初始化简化为
+- `user/src/function.cpp`：`ina228_cfg` 从全字段 20 行聚合初始化简化为
   `{.alert_port = GPIOG, .alert_pin = GPIO_PIN_14}` 两行
 
 ### 影响范围
@@ -874,7 +874,7 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 
 ### Added
 
-- `user/src/founction.cpp`：INA228 注册报警引脚 **PG14**（`Config::alert_port=GPIOG, alert_pin=GPIO_PIN_14`），
+- `user/src/function.cpp`：INA228 注册报警引脚 **PG14**（`Config::alert_port=GPIOG, alert_pin=GPIO_PIN_14`），
   新增 `ina228_selftest()` 全功能自检（连接/ID → 校准 → 测量 → 阈值写入 → 报警触发/清除 → 寄存器 dump → 软复位恢复）
 - 主循环每秒周期采样打印 `[INA228] Vbus/I/P/T/ALERT`
 
@@ -924,9 +924,9 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 
 - `CMakeLists.txt`：删除 5 个不存在的 device 源文件引用（`device_debug/rs485/rs232/w25q128.cpp`），
   加入 `device_serial.cpp` 与 4 个 INA 文件，恢复可构建
-- `modbus.hpp` / `modbus.cpp` / `string_pro.cpp` / `founction.hpp` / `founction.cpp`：
+- `modbus.hpp` / `modbus.cpp` / `string_pro.cpp` / `function.hpp` / `function.cpp`：
   `#include "device_debug.hpp"` → `"device_serial.hpp"`（文件已合并）
-- `founction.cpp`：`i2c_bus.i2c_init()` → `i2c_bus.init()`（旧 API 残留）
+- `function.cpp`：`i2c_bus.i2c_init()` → `i2c_bus.init()`（旧 API 残留）
 
 ### 兼容性
 
@@ -1144,7 +1144,7 @@ DMA: done=1 frame0=[1705,1472] frame9=[1706,1472]        // DMA 循环搬运持�
 | `device/src/device_ina228.cpp` | 28 处 send_data 调用添加 `(void)` |
 | `protocol/modbus/src/modbus.cpp` | 1 处 send_data_it 调用添加 `(void)` |
 | `protocol/string/src/string_pro.cpp` | 1 处 send_data 调用添加 `(void)` |
-| `user/src/founction.cpp` | 1 处 send_data 调用添加 `(void)` |
+| `user/src/function.cpp` | 1 处 send_data 调用添加 `(void)` |
 
 ---
 
@@ -1201,7 +1201,7 @@ modbus_t: [rx_buf*] [rx_len] [rx_flag] [tx_data*] [tx_len] [tx_idx] [tx_busy]
 | `modbus.cpp` | 端口表 `&pc_receive_buffer` → `debug_uart.buffer()`；`tx_buf` → `tx_buf_arr` |
 | `inter_usart.cpp` | ISR 错误处理增加 `buf->rx_flag = 0`（配合 Bug 5 修复） |
 | `CMakeLists.txt` | 剔除 `usart_async_port.cpp`，启用 `inter_usart.cpp`；注释 `modbus_port_cfg.cpp` |
-| `founction.cpp` | 头文件 `usart_async_port.hpp` → `inter_usart.hpp` |
+| `function.cpp` | 头文件 `usart_async_port.hpp` → `inter_usart.hpp` |
 | `protocol.hpp` | `ACTIVE_PROTOCOL` = `PROTOCOL_MODBUS` |
 
 ### 验证
@@ -1223,7 +1223,7 @@ modbus_t: [rx_buf*] [rx_len] [rx_flag] [tx_data*] [tx_len] [tx_idx] [tx_busy]
   app/inc/protocol.hpp                  — 协议宏修正
   device/inc/device_debug.hpp                — 类型统一
   device/src/device_debug.cpp                — 使用 inter_usart
-  user/src/founction.cpp                — INA228 集成
+  user/src/function.cpp                — INA228 集成
   code/inc/link.h                       — 类型统一
   CMakeLists.txt                        — 清理构建目标
 
