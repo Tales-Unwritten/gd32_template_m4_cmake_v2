@@ -25,19 +25,19 @@
 
 /* ── 外设 ──────────────────────────────────────────── */
 
-inter_i2c_bus i2c_bus({GPIOE, GPIOE, GPIO_PIN_2, GPIO_PIN_3}, 1);
+inter_i2c_bus i2c_bus({portE, portE, pin2, pin3});   // 软 I2C：PE2/PE3，默认 400k@240MHz
 
 /* ── 软串口（测试模式：PA9/PA10，与硬件 debug_uart 同引脚，测试期间禁用硬件） ── */
-soft_uart_port suart({
-    GPIOA, GPIO_PIN_9,        // TX
-    GPIOA, GPIO_PIN_10,       // RX
-    soft_uart_port::BAUD_115200
+soft_uart_port<256> suart({
+    portA, pin9,        // TX
+    portA, pin10,       // RX
+    soft_uart_port<256>::BAUD_115200
 });
 /* ── INA228 配置：报警引脚 PG14（ALERT 开漏低有效，内部上拉） ── */
 /* C++20 designated initializer：只配置需要的字段，其余用默认值 */
 static const INA228::Config ina228_cfg = {
-    .alert_port = GPIOG,
-    .alert_pin  = GPIO_PIN_14,
+    .alert_port = portG,
+    .alert_pin  = pin14,
 };
 
 INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40, ina228_cfg);
@@ -45,18 +45,18 @@ INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40, ina228_cfg);
 /* ── CAN 总线（CAN1 @ PB12/RX PB13/TX，双板互联 NORMAL 模式） ── */
 [[maybe_unused]] static can_port can_bus({
     .periph      = can_id::can1,
-    .tx_port     = GPIOB, .tx_pin = GPIO_PIN_13,
-    .rx_port     = GPIOB, .rx_pin = GPIO_PIN_12,
-    .af          = GPIO_AF_9,
+    .tx_port     = portB, .tx_pin = pin13,
+    .rx_port     = portB, .rx_pin = pin12,
+    .af          = af9,
     .baudrate    = 1000000,   // 1Mbps 极限速率实测（12TQ: 60MHz/1M/12 = prescaler 5）
     .mode        = CAN_NORMAL_MODE,
     .filter_bank = 15,     // CAN1 标准起始 bank
 });
 [[maybe_unused]] static uint32_t s_can_tx_count = 0;
 
-io_ctrl led1(GPIOC, GPIO_PIN_4);
-io_ctrl led2(GPIOC, GPIO_PIN_5);
-io_ctrl led3(GPIOA, GPIO_PIN_7);
+io_ctrl led1(portC, pin4);
+io_ctrl led2(portC, pin5);
+io_ctrl led3(portA, pin7);
 
 /* ── 初始化 ──────────────────────────────────────────── */
 [[maybe_unused]] static void ina228_selftest(void);   // 定义见下方（测试固件暂未调用）
@@ -65,6 +65,7 @@ io_ctrl led3(GPIOA, GPIO_PIN_7);
 [[maybe_unused]] static void exti_selftest(void);     // 定义见下方
 [[maybe_unused]] static void adc_selftest(void);      // 定义见下方
 [[maybe_unused]] static void suart_baud_test(void);   // 定义见下方
+
 void function_init(void)
 {
 #ifdef APP_IAP
@@ -75,11 +76,12 @@ void function_init(void)
     // DebugPort_Init();
     suart.init();
     // ⚠️ 双板 CAN 实测：仅初始化 CAN，跳过其他自检
-    // i2c_bus.init();
-    // INA228_2.init();
-    led1.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-    led2.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-    led3.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    // ⚠️ 本轮验证：启用软 I2C 总线 + INA228 自检（I2C 抽象化上板验证）
+    i2c_bus.init();
+    // INA228_2.init();   // 自检内部会 reset+init，此处无需重复
+    led1.init(mode_output, nopull, otype_pp, speed_high);
+    led2.init(mode_output, nopull, otype_pp, speed_high);
+    led3.init(mode_output, nopull, otype_pp, speed_high);
     Protocol_Init();
 
 #ifdef APP_IAP
@@ -103,6 +105,7 @@ void function_init(void)
     // if (!ok)
     //     (void)suart.send_data((const uint8_t *)"[CAN1] init FAILED\r\n", 22);
 
+    ina228_selftest();
     w25q128_hw_selftest();
 }
 
@@ -369,12 +372,12 @@ void function_loop(void)
 /* ── W25Q64 软 SPI 测试（inter_soft_spi 实测） ───────────────── */
 /* 板级接线：CS=PF6, CLK=PF7, MISO=PF8, MOSI=PF9（MODE0, MSB first, 最快） */
 static soft_spi_bus w25q_spi({
-    GPIOF, GPIO_PIN_7,      // SCK
-    GPIOF, GPIO_PIN_9,      // MOSI
-    GPIOF, GPIO_PIN_8,      // MISO
-    GPIOF, GPIO_PIN_6,      // CS
-    RESET,                  // CS 低有效
-    0, 0, 0                 // MODE0, MSB first, delay=0
+    portF, pin7,      // SCK
+    portF, pin9,      // MOSI
+    portF, pin8,      // MISO
+    portF, pin6,      // CS
+    Low,              // CS 低有效
+    soft_mode_0, MSB, 0   // MODE0, MSB first, delay=0
 });
 
 static void w25q_xfer(soft_spi_bus &spi, const uint8_t *tx, uint8_t *rx, uint16_t len)
@@ -520,12 +523,12 @@ static void w25q64_selftest(void)
    与旧 C 驱动 hard_w25q128 相同配置；软 SPI 测试为 MODE0（W25Q 两种模式均支持） */
 static spi_port w25q_hw_spi({
     spi_id::spi4,
-    GPIOF, GPIO_PIN_7,        // SCK
-    GPIOF, GPIO_PIN_9,        // MOSI
-    GPIOF, GPIO_PIN_8,        // MISO
-    GPIOF, GPIO_PIN_6,        // CS
-    RESET,                    // CS 低有效
-    GPIO_AF_5,
+    portF, pin7,              // SCK
+    portF, pin9,              // MOSI
+    portF, pin8,              // MISO
+    portF, pin6,              // CS
+    Low,                      // CS 低有效
+    af5,
     SPI_PSC_2,
     SPI_CK_PL_HIGH_PH_2EDGE,  // MODE3 (CPOL=1, CPHA=1)
     SPI_ENDIAN_MSB,
@@ -621,14 +624,14 @@ static void exti_selftest(void)
     txln("\r\n========== EXTI SELF TEST ==========");
 
     // 1. GPIO 线：PA0 上升沿
-    static exti_port exti_pa0({.port = GPIOA, .pin = GPIO_PIN_0,
+    static exti_port exti_pa0({.port = portA, .pin = pin0,
                                .trigger = exti_trigger::rising});
     bool ok1 = exti_pa0.init();
     exti_pa0.on_interrupt([](void*) { s_fire_count = s_fire_count + 1; });
     exti_pa0.enable();
 
     // 2. 线路互斥：PB0 与 PA0 同为 EXTI 线 0，应注册失败
-    static exti_port exti_pb0({.port = GPIOB, .pin = GPIO_PIN_0});
+    static exti_port exti_pb0({.port = portB, .pin = pin0});
     bool ok2 = exti_pb0.init();
 
     len = snprintf(buf, sizeof(buf), "init PA0=%d  init PB0(same line)=%d  (expect 1,0)\r\n", ok1, ok2);

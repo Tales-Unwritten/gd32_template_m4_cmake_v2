@@ -31,13 +31,13 @@
 /* ── boot 硬件实例 ────────────────────────────────────────
  * USART0 @ PA9(TX)/PA10(RX)，115200-8N1（与 app 侧软串口同引脚，
  * 每次复位后重新初始化，互不干扰） */
-static usart_port s_boot_uart({
-    USART0, GPIOA, GPIO_PIN_9, GPIOA, GPIO_PIN_10,
-    GPIO_AF_7, IAP_BAUDRATE, 512
+static usart_port<512> s_boot_uart({
+    USART0, portA, pin9, portA, pin10,
+    af7, IAP_BAUDRATE
 });
 
 /* PC13 按键：上拉输入，低电平=按下 */
-static io_ctrl s_key(GPIOC, GPIO_PIN_13);
+static io_ctrl s_key(portC, pin13);
 
 /* ── 端口表（对齐 modbus_ports[] / string_ports[] 模式） ── */
 static void Boot_UartSend(uint8_t *b, uint16_t l) { (void)s_boot_uart.send_data(b, l); }
@@ -71,7 +71,7 @@ static void Boot_Init(void)
 {
     systick_config();
     s_boot_uart.init();
-    s_key.init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+    s_key.init(mode_input, pullup);
 
     /* flash 安全区：AppA + AppB + Param0 + Param1（不含 boot 自身扇区，防误擦） */
     flash_port::init(IAP_APP_A_ADDR, (IAP_PARAM1_ADDR + IAP_PARAM_SIZE) - IAP_APP_A_ADDR);
