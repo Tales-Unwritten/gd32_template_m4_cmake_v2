@@ -356,7 +356,7 @@ arm-none-eabi-gdb build/debug/gd32f470_template.elf
 | `timer_port` | `interface/inc/inter_timer.hpp` | 基本定时 + PWM + 中断 | ✅ 正式 |
 | `inter_i2c_bus` | `interface/inc/inter_i2c_bus.hpp` | 软件 I2C 总线（GPIO 位反转） | ✅ 正式 |
 | `inter_i2c_dev` | `interface/inc/inter_i2c_dev.hpp` | I2C 设备基类 | ✅ 正式 |
-| `i2c_hw_port` | `interface/inc/inter_i2c_hw.hpp` | 硬件 I2C 主机（阻塞读写） | ✅ 正式 |
+| `i2c_hw_bus` | `interface/inc/inter_i2c_hw.hpp` | 硬件 I2C 主机（阻塞读写） | ✅ 正式 |
 | `can_port` | `interface/inc/inter_can.hpp` | CAN 总线收发（阻塞） | ✅ 正式 |
 | `adc_port` | `interface/inc/inter_adc.hpp` | ADC 单通道 + 扫描模式 | ✅ 正式 |
 | `dac_port` | `interface/inc/inter_dac.hpp` | DAC 双通道电压输出 | ✅ 正式 |

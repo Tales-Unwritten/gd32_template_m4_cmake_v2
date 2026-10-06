@@ -210,7 +210,7 @@ class usart_async_port {
 - `wait_ack()` 带有超时机制（1000 次循环）
 - 互斥锁 `_busy` 标志位
 
-### 硬件 I2C（i2c_hw_port，规划中）
+### 硬件 I2C（i2c_hw_bus，规划中）
 
 - 替代软 I2C，降低 CPU 占用
 - INA228 可迁移到硬件 I2C 提升稳定性
@@ -337,7 +337,7 @@ enum class usart_id : uint8_t {
 | SPI | `spi_port` | ✅ 生产 |
 | Timer | `timer_port` | ✅ 生产 |
 | CAN | `can_port` | ✅ 生产 (规划B) |
-| 硬件 I2C | `i2c_hw_port` | ✅ 生产 (规划B) |
+| 硬件 I2C | `i2c_hw_bus` | ✅ 生产 (规划B) |
 | ADC | `adc_port` | ✅ 生产 (规划B) |
 | DAC | `dac_port` | ✅ 生产 (规划B) |
 | DMA | `dma_port` | ✅ 生产 (规划B) |
