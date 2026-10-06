@@ -43,8 +43,10 @@
 #define configUSE_MUTEXES                        ( 1 )
 #define configUSE_RECURSIVE_MUTEXES              ( 1 )
 #define configUSE_COUNTING_SEMAPHORES            ( 1 )
-#define configUSE_QUEUE_SETS                     ( 0 )
+#define configUSE_QUEUE_SETS                     ( 1 )   /* 队列集 xQueueCreateSet / xQueueSelectFromSet */
 #define configUSE_STREAM_BUFFERS                 ( 1 )
+#define configUSE_APPLICATION_TASK_TAG           ( 1 )   /* 任务标签：vTaskSetApplicationTaskTag 等 */
+#define configUSE_SB_COMPLETED_CALLBACK          ( 1 )   /* 流/消息缓冲发送·接收完成回调（*CreateWithCallback） */
 #define configQUEUE_REGISTRY_SIZE                ( 8 )
 #define configUSE_NEWLIB_REENTRANT               ( 0 )
 
@@ -66,9 +68,9 @@
 /*==========================================================================
  * 运行时统计 / 调试
  *========================================================================*/
-#define configGENERATE_RUN_TIME_STATS            ( 0 )
-#define configUSE_TRACE_FACILITY                 ( 0 )
-#define configUSE_STATS_FORMATTING_FUNCTIONS     ( 0 )
+#define configGENERATE_RUN_TIME_STATS            ( 0 )   /* 需自定义运行时间计数器，暂不启用 */
+#define configUSE_TRACE_FACILITY                 ( 1 )   /* vTaskGetInfo / uxTaskGetSystemState / uxQueueGetQueueNumber */
+#define configUSE_STATS_FORMATTING_FUNCTIONS     ( 1 )   /* vTaskList（依赖 TRACE_FACILITY；会引入 sprintf） */
 #define configCHECK_FOR_STACK_OVERFLOW           ( 0 )
 #define configUSE_MALLOC_FAILED_HOOK             ( 0 )
 
@@ -99,20 +101,33 @@
 
 /*==========================================================================
  * API 函数裁剪（按需开启，关闭可减小体积）
+ *   注意：INCLUDE_ 只门控「可选 API」；队列 / 信号量 / 互斥量由
+ *         configUSE_* 与 configSUPPORT_* 决定，不受 INCLUDE_ 控制。
  *========================================================================*/
+
+/* ── 任务类 ─────────────────────────────────────────────── */
 #define INCLUDE_vTaskPrioritySet                 ( 1 )
 #define INCLUDE_uxTaskPriorityGet                ( 1 )
 #define INCLUDE_vTaskDelete                      ( 1 )
 #define INCLUDE_vTaskSuspend                     ( 1 )
-#define INCLUDE_vTaskDelayUntil                  ( 1 )
 #define INCLUDE_vTaskDelay                       ( 1 )
-#define INCLUDE_xTaskGetSchedulerState           ( 1 )
-#define INCLUDE_xTaskGetCurrentTaskHandle        ( 1 )
-#define INCLUDE_uxTaskGetStackHighWaterMark      ( 1 )
-#define INCLUDE_xTaskGetIdleTaskHandle           ( 0 )
-#define INCLUDE_eTaskGetState                    ( 1 )
-#define INCLUDE_xTimerPendFunctionCall           ( 0 )
+#define INCLUDE_xTaskDelayUntil                  ( 1 )   /* v11 起的新名（替代 INCLUDE_vTaskDelayUntil） */
 #define INCLUDE_xTaskAbortDelay                  ( 1 )
+#define INCLUDE_xTaskGetCurrentTaskHandle        ( 1 )
+#define INCLUDE_xTaskGetSchedulerState           ( 1 )
+#define INCLUDE_xTaskGetIdleTaskHandle           ( 1 )
+#define INCLUDE_xTaskGetHandle                   ( 1 )
+#define INCLUDE_eTaskGetState                    ( 1 )
+#define INCLUDE_uxTaskGetStackHighWaterMark      ( 1 )
+#define INCLUDE_uxTaskGetStackHighWaterMark2     ( 1 )
+#define INCLUDE_xTaskResumeFromISR               ( 1 )
+
+/* ── 队列 / 互斥量 附加查询 ─────────────────────────────── */
+#define INCLUDE_xQueueGetMutexHolder             ( 1 )
+#define INCLUDE_xSemaphoreGetMutexHolder         ( 1 )
+
+/* ── 软件定时器 ─────────────────────────────────────────── */
+#define INCLUDE_xTimerPendFunctionCall           ( 1 )
 
 /*==========================================================================
  * 断言：命中即关中断死循环，便于调试器定位

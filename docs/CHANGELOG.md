@@ -1,5 +1,68 @@
 # Changelog
 
+## 2026-10-06 — FreeRTOS API 编辑器跳转索引 + 两项配置补全
+
+### Added
+
+- `code/src/freertos_api_index.c`：由脚本自动生成的 **API 索引**（199 个已启用 API），
+  采用 `/// 名字()` + `/// 说明` 的**文档注释风格**，并在每条下附**代码引用行**作兜底：
+  注释行靠 clangd 的“注释内跳转”，代码引用行是标准转到定义（任何 clangd 都能跳）。
+  函数 → `.c` 实现，宏 → 宏定义处。文件仅含 `#include` + 注释 + 一个从不调用的
+  `static inline` 函数（内含引用），**零代码/零数据**（`nm` 验证无 `T/D/B` 符号）；
+  纳入构建以获得 clangd 正确的编译参数；CMake 中仅当 `USE_FREERTOS=1` 时编译。
+
+### Changed
+
+- `code/inc/FreeRTOSConfig.h`：新增 `configUSE_APPLICATION_TASK_TAG=1`、
+  `configUSE_SB_COMPLETED_CALLBACK=1`（使 `vTask*ApplicationTaskTag`、
+  `*CreateWithCallback` 系列真正可用；对应 README 条目标注为 ✅）。
+
+### Verified
+
+- `debug` 构建通过、无新增告警；`text` 仍 36500B（未用 API 被 `--gc-sections` 回收，
+  故开这两个配置宏不增 Flash）；索引目标文件经 `nm` 校验无任何代码/数据符号。
+
+## 2026-10-06 — FreeRTOS 常用 API / 功能补全（FreeRTOSConfig.h）
+
+### Changed
+
+- `code/inc/FreeRTOSConfig.h`：补全常用可选 API 与功能
+  - 任务类 `INCLUDE_`：新增 `INCLUDE_xTaskGetHandle` / `INCLUDE_xTaskGetIdleTaskHandle` /
+    `INCLUDE_uxTaskGetStackHighWaterMark2` / `INCLUDE_xTaskResumeFromISR`；
+    `INCLUDE_vTaskDelayUntil` 改为 v11 新名 `INCLUDE_xTaskDelayUntil`
+    （两者**不可同时定义**，否则内核 `#error`）。
+  - 队列 / 互斥量：`configUSE_QUEUE_SETS` 0→1；`INCLUDE_xQueueGetMutexHolder` /
+    `INCLUDE_xSemaphoreGetMutexHolder` 置 1。
+  - 软件定时器：`INCLUDE_xTimerPendFunctionCall` 置 1。
+  - 调试：`configUSE_TRACE_FACILITY` 0→1、`configUSE_STATS_FORMATTING_FUNCTIONS` 0→1
+    （启用 `vTaskGetInfo` / `uxTaskGetSystemState` / `vTaskList` 等）。
+
+### Verified
+
+- `debug` 编译通过；Flash 36048→**36500B（+452B）**，BSS 不变（40512B）。
+- 上板（DAP-Link / `/dev/ttyACM0`，`tests/test_string.py`）：**35/35 通过**，
+  压力 100/100、丢包 0%、INA228 `MFR=0x5449 / DEV=0x2281`。
+
+### Docs
+
+- `freertos/README.md`：新增「常用 API 速查（按功能分类）」——分 10 类
+  （任务 / 内核控制 / 队列 / 信号量与互斥量 / 软件定时器 / 事件组 / 流·消息缓冲 /
+  任务通知 / 内存管理 / 列表）列出 **249 个公共 API**，每行 `函数名  /// 中文说明`，
+  并标注当前配置下的可用性（✅ 已启用 / ⚙️ 需开宏 / ➖ 底层内部 / ⛔ 不适用）。
+- 每个函数名均为**可点击链接**，点击直接跳到**代码实现处**（`文件#L行号`）：
+  函数 → 对应 `.c` 实现；宏 → 递归解析到它最终调用的 `.c` 实现
+  （如 `xQueueCreate` → `queue.c` 的 `xQueueGenericCreate`）；
+  仅纯头文件宏（`taskYIELD`/`portYIELD`/`listGET_OWNER_OF_NEXT_ENTRY` 等 8 个）指向头文件。
+  链接由脚本按「`.c` 实现 → 宏展开递归 → 头文件原型」优先级生成，
+  排除 MPU 别名头与空体桩宏干扰，并优先指向本工程实际编译的 `heap_4.c` / GCC 端口。
+
+### Notes
+
+- 澄清：队列 / 二值·计数·递归信号量 / 互斥量 / 事件组 / 流缓冲**本就可用**，
+  由 `configSUPPORT_DYNAMIC_ALLOCATION` 与 `configUSE_*` 控制，**不受 `INCLUDE_` 门控**。
+- 仍未启用的常见项：`configCHECK_FOR_STACK_OVERFLOW`、`configUSE_MALLOC_FAILED_HOOK`
+  （需配套实现 hook 函数）、`configGENERATE_RUN_TIME_STATS`（需运行时间计数器）。
+
 ## 2026-10-06 — 引入 FreeRTOS 内核（V11.3.1）+ 目录规范化
 
 ### Added

@@ -256,6 +256,9 @@ if(USE_FREERTOS)
 
         # ── GCC Cortex-M4F 移植层 ───────────────────
         ${FREERTOS_PORT}/port.c
+
+        # ── API 索引（仅编辑器跳转用，编译为空） ──
+        code/src/freertos_api_index.c
     )
 
     target_include_directories(${PROJECT_NAME}.elf PRIVATE
