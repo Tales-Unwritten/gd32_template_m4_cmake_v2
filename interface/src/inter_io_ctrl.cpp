@@ -4,7 +4,7 @@
 //  构造 / 析构 / 移动
 // ============================================================
 
-io_ctrl::io_ctrl(uint32_t gpio_periph, uint32_t pin)
+io_ctrl::io_ctrl(port_enum_t gpio_periph, pin_enum_t pin)
     : _gpio_periph(gpio_periph), _pin(pin), _mode(MODE_UNSET), _otype(OTYPE_DEF), _speed(SPEED_DEF), _initialized(false)
 {
 }
@@ -39,11 +39,7 @@ io_ctrl &io_ctrl::operator=(io_ctrl &&other) noexcept
         other._mode = MODE_UNSET;
     }
     return *this;
-
 }
-
-
-
 
 // ============================================================
 //  时钟使能
@@ -52,23 +48,28 @@ io_ctrl &io_ctrl::operator=(io_ctrl &&other) noexcept
 void io_ctrl::_enable_clock()
 {
     // rcu_periph_clock_enable 内部幂等
-    if (_gpio_periph == GPIOA)
+    if (_gpio_periph == portA)
         rcu_periph_clock_enable(RCU_GPIOA);
-    else if (_gpio_periph == GPIOB)
+    else if (_gpio_periph == portB)
         rcu_periph_clock_enable(RCU_GPIOB);
-    else if (_gpio_periph == GPIOC)
+    else if (_gpio_periph == portC)
         rcu_periph_clock_enable(RCU_GPIOC);
-    else if (_gpio_periph == GPIOD)
+    else if (_gpio_periph == portD)
         rcu_periph_clock_enable(RCU_GPIOD);
-    else if (_gpio_periph == GPIOE)
+    else if (_gpio_periph == portE)
         rcu_periph_clock_enable(RCU_GPIOE);
-    else if (_gpio_periph == GPIOF)
+    else if (_gpio_periph == portF)
         rcu_periph_clock_enable(RCU_GPIOF);
-    else if (_gpio_periph == GPIOG)
+    else if (_gpio_periph == portG)
         rcu_periph_clock_enable(RCU_GPIOG);
 #ifdef GPIOH
-    else if (_gpio_periph == GPIOH)
+    else if (_gpio_periph == portH)
         rcu_periph_clock_enable(RCU_GPIOH);
+#endif
+
+#ifdef GPIOI
+    else if (_gpio_periph == portI)
+        rcu_periph_clock_enable(RCU_GPIOI);
 #endif
     else
     {
@@ -80,11 +81,11 @@ void io_ctrl::_enable_clock()
 //  配置应用
 // ============================================================
 
-void io_ctrl::_apply(uint32_t mode, uint32_t pull, uint8_t otype, uint32_t speed)
+void io_ctrl::_apply(mode_enum_t mode, pull_enum_t pull, otype_enum_t otype, speed_enum_t speed)
 {
     gpio_mode_set(_gpio_periph, mode, pull, _pin);
 
-    if (mode == GPIO_MODE_OUTPUT || mode == GPIO_MODE_AF)
+    if (mode == mode_output || mode == mode_af)
     {
         gpio_output_options_set(_gpio_periph, otype, speed, _pin);
         _otype = otype; // 缓存
@@ -98,7 +99,7 @@ void io_ctrl::_apply(uint32_t mode, uint32_t pull, uint8_t otype, uint32_t speed
 //  init / reinit / deinit
 // ============================================================
 
-void io_ctrl::init(uint32_t mode, uint32_t pull, uint8_t otype, uint32_t speed)
+void io_ctrl::init(mode_enum_t mode, pull_enum_t pull, otype_enum_t otype, speed_enum_t speed)
 {
     if (_initialized)
         return; // Release 安全
@@ -108,7 +109,7 @@ void io_ctrl::init(uint32_t mode, uint32_t pull, uint8_t otype, uint32_t speed)
     _initialized = true;
 }
 
-void io_ctrl::reinit(uint32_t mode, uint32_t pull, uint8_t otype, uint32_t speed)
+void io_ctrl::reinit(mode_enum_t mode, pull_enum_t pull, otype_enum_t otype, speed_enum_t speed)
 {
     if (!_initialized)
         return; // Release 安全
@@ -120,7 +121,7 @@ void io_ctrl::deinit()
 {
     if (_initialized)
     {
-        gpio_mode_set(_gpio_periph, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, _pin);
+        gpio_mode_set(_gpio_periph, mode_analog, nopull, _pin);
         _initialized = false;
         _mode = MODE_UNSET;
     }
@@ -130,14 +131,14 @@ void io_ctrl::deinit()
 //  独立属性修改
 // ============================================================
 
-void io_ctrl::set_pull(uint32_t pull)
+void io_ctrl::set_pull(pull_enum_t pull)
 {
     if (!_check_init())
         return;
     gpio_mode_set(_gpio_periph, _mode, pull, _pin);
 }
 
-void io_ctrl::set_speed(uint32_t speed)
+void io_ctrl::set_speed(speed_enum_t speed)
 {
     if (!_check_out())
         return;
@@ -145,7 +146,7 @@ void io_ctrl::set_speed(uint32_t speed)
     _speed = speed;
 }
 
-void io_ctrl::set_otype(uint8_t otype)
+void io_ctrl::set_otype(otype_enum_t otype)
 {
     if (!_check_out())
         return;
@@ -157,7 +158,7 @@ void io_ctrl::set_otype(uint8_t otype)
 //  复用功能（放宽了 AF 模式限制） ─────────────────────────
 // ============================================================
 
-void io_ctrl::set_af(uint32_t alt_func_num)
+void io_ctrl::set_af(af_enum_t alt_func_num)
 {
     if (!_initialized)
         return;
@@ -210,27 +211,49 @@ void io_ctrl::set(bool value)
     value ? high() : low();
 }
 
-void io_ctrl::write(bit_status bit_value)
+void io_ctrl::write(polarity bit_value)
 {
     if (!_initialized)
         return;
-    gpio_bit_write(_gpio_periph, _pin, bit_value);
+    if (bit_value)
+    {
+        gpio_bit_write(_gpio_periph, _pin, SET);
+    }
+    else
+    {
+        gpio_bit_write(_gpio_periph, _pin, RESET);
+    }
 }
 
 // ============================================================
 //  输入
 // ============================================================
 
-FlagStatus io_ctrl::read()
+polarity io_ctrl::read()
 {
     if (!_check_init())
-        return RESET;
-    return gpio_input_bit_get(_gpio_periph, _pin);
+        return Low;
+    if (gpio_input_bit_get(_gpio_periph, _pin))
+    {
+        return High;
+    }
+    else
+    {
+        return Low;
+    }
 }
 
-FlagStatus io_ctrl::read_output()
+polarity io_ctrl::read_output()
 {
     if (!_check_out())
-        return RESET;
-    return gpio_output_bit_get(_gpio_periph, _pin);
+        return Low;
+
+    if (gpio_output_bit_get(_gpio_periph, _pin))
+    {
+        return High;
+    }
+    else
+    {
+        return Low;
+    }
 }

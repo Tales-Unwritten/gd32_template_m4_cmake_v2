@@ -37,9 +37,9 @@ enum class timer_id : uint8_t
 /** @brief PWM 通道引脚配置 */
 struct TimerChannelConfig
 {
-    uint32_t port; ///< GPIO 端口（0 = 不使用此通道）
-    uint32_t pin;  ///< 引脚掩码
-    uint32_t af;   ///< 复用功能编号
+    port_enum_t port; ///< GPIO 端口（port_none = 不使用此通道）
+    pin_enum_t  pin;  ///< 引脚（pin0~pin15）
+    af_enum_t   af;   ///< 复用功能编号（af0~af15）
 };
 
 /**
@@ -63,7 +63,7 @@ struct TimerPortConfig
     uint32_t frequency_hz;
     uint32_t prescaler;             ///< 预分频值（自动模式：init 回写计算结果）
     uint32_t period;                ///< 自动重装载值（自动模式：init 回写计算结果）
-    TimerChannelConfig channels[4]; ///< PWM 通道（port=0 表示不用）
+    TimerChannelConfig channels[4]; ///< PWM 通道（port=port_none 表示不用）
     uint8_t channel_count;          ///< 实际使用的 PWM 通道数
 };
 
@@ -85,7 +85,7 @@ struct TimerPortConfig
  * 使用示例（PWM 输出，1kHz, 50% 占空比，手动指定分频）：
  *   static timer_port pwm({
  *       timer_id::timer2, 0, 119, 999,
- *       {{{GPIOA, GPIO_PIN_1, GPIO_AF_1}}}, 1
+ *       {{{portA, pin1, af1}}}, 1
  *   });
  *   pwm.init();
  *   pwm.pwm_set_duty_percent(0, 50.0f);  // 50% of period

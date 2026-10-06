@@ -12,32 +12,48 @@
  * 架构对齐 inter_i2c_bus（总线模式）：
  *  - SCK/MOSI/MISO 为共享总线，由本对象独占管理（含互斥锁）
  *  - CS 双模式：内部单 CS（Config 指定，自动 select/deselect）
- *              或外部 CS（cs_port=0，由设备驱动层自行控制，支持多设备共享总线）
+ *              或外部 CS（cs_port=port_none，由设备驱动层自行控制，支持多设备共享总线）
  *  - 零堆分配：全部 io_ctrl 成员对象
  *
  * 参考开源实现：
  *  - Rob Tillaart SWSPI（Arduino）：mode/bitOrder 语义、位循环思路
  *  - 项目 inter_i2c_bus：io_ctrl 组合、lock/unlock 互斥、delay_us 速率控制
  */
+// ── 软件 SPI 时序枚举（与 STM32 版对齐） ──
+
+enum soft_mode_enum_t : uint8_t
+{
+    soft_mode_0 = 0,   // CPOL=0 CPHA=0
+    soft_mode_1,       // CPOL=0 CPHA=1
+    soft_mode_2,       // CPOL=1 CPHA=0
+    soft_mode_3,       // CPOL=1 CPHA=1
+};
+
+enum soft_order_enum_t : uint8_t
+{
+    MSB = 0,   // 高位先出
+    LSB,       // 低位先出
+};
+
 struct SoftSpiConfig
 {
     // ── 共享总线引脚 ──
-    uint32_t sck_port;             // SCK 端口，如 GPIOA
-    uint32_t sck_pin;              // SCK 引脚掩码，如 GPIO_PIN_5
-    uint32_t mosi_port;            // MOSI 端口
-    uint32_t mosi_pin;             // MOSI 引脚掩码
-    uint32_t miso_port;            // MISO 端口（输入）
-    uint32_t miso_pin;             // MISO 引脚掩码
+    port_enum_t sck_port;              // SCK 端口，如 portA
+    pin_enum_t  sck_pin;               // SCK 引脚，如 pin5
+    port_enum_t mosi_port;             // MOSI 端口
+    pin_enum_t  mosi_pin;              // MOSI 引脚
+    port_enum_t miso_port;             // MISO 端口（输入）
+    pin_enum_t  miso_pin;              // MISO 引脚
 
-    // ── 内部片选（0 = 外部 CS 模式） ──
-    uint32_t cs_port        = 0;   // CS 端口（0 = 不使用内部 CS）
-    uint32_t cs_pin         = 0;   // CS 引脚掩码（0 = 不使用）
-    uint32_t cs_active_level = 0;  // CS 有效电平: RESET(0,低有效) / SET(1,高有效)
+    // ── 内部片选（port_none = 外部 CS 模式） ──
+    port_enum_t cs_port        = port_none;  // CS 端口（port_none = 不使用内部 CS）
+    pin_enum_t  cs_pin         = pin_none;   // CS 引脚（pin_none = 不使用）
+    polarity    cs_active_level = Low;       // CS 有效电平: Low(低有效) / High(高有效)
 
     // ── 时序 ──
-    uint8_t  mode           = 0;   // SPI_MODE0~3（CPOL = mode>>1, CPHA = mode&1）
-    uint8_t  bit_order      = 0;   // 0 = MSB first, 1 = LSB first
-    uint8_t  delay_us       = 0;   // 半周期延时（0 = 最快速度，io_ctrl 开销决定速率）
+    soft_mode_enum_t  mode      = soft_mode_0;  // SPI_MODE0~3（CPOL = mode>>1, CPHA = mode&1）
+    soft_order_enum_t bit_order = MSB;          // MSB = 高位先出, LSB = 低位先出
+    uint8_t           delay_us  = 0;            // 半周期延时（0 = 最快速度，io_ctrl 开销决定速率）
 };
 
 /**
@@ -45,8 +61,8 @@ struct SoftSpiConfig
  *
  * 使用示例（单设备，内部 CS，MODE0，MSB first）：
  *   static soft_spi_bus flash({
- *       GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_7, GPIOA, GPIO_PIN_6,
- *       GPIOA, GPIO_PIN_4, RESET, 0, 0, 0
+ *       portA, pin5, portA, pin7, portA, pin6,
+ *       portA, pin4, Low, soft_mode_0, MSB, 0
  *   });
  *   flash.init();
  *   flash.cs_select();
@@ -54,7 +70,7 @@ struct SoftSpiConfig
  *   flash.cs_deselect();
  *
  * 使用示例（多设备共享总线，外部 CS）：
- *   // cs_port = 0；每设备各自持有 io_ctrl 片选：
+ *   // cs_port = port_none；每设备各自持有 io_ctrl 片选：
  *   //   dev_a.cs_select();  bus.transfer(...);  dev_a.cs_deselect();
  */
 class soft_spi_bus : public spi_bus
@@ -95,9 +111,9 @@ public:
 
     // ── 运行时配置 ────────────────────────────────────────
 
-    void set_mode(uint8_t mode);       // 0..3（运行时切换 CPOL/CPHA）
-    void set_bit_order(uint8_t order); // 0=MSB first, 1=LSB first
-    void set_speed(uint8_t delay_us);  // 半周期延时（0 = 最快）
+    void set_mode(soft_mode_enum_t mode);        // soft_mode_0..3（运行时切换 CPOL/CPHA）
+    void set_bit_order(soft_order_enum_t order); // MSB / LSB（运行时切换位序）
+    void set_speed(uint8_t delay_us);            // 半周期延时（0 = 最快）
 
     // ── 互斥（对齐 inter_i2c_bus，多任务/ISR 安全） ────────
 
@@ -114,12 +130,12 @@ private:
     io_ctrl _miso;
     io_ctrl _cs;                       // 内部 CS（_has_cs=false 时未初始化）
 
-    uint8_t _mode;                     // SPI_MODE0~3
-    uint8_t _bit_order;                // 0=MSB, 1=LSB
+    soft_mode_enum_t  _mode;           // SPI_MODE0~3
+    soft_order_enum_t _bit_order;      // MSB / LSB
     uint8_t _delay_us;
     bool    _cpol;                     // 缓存：SCK 空闲电平（1=高, 0=低）
     bool    _cpha;                     // 缓存：采样沿（0=第一沿, 1=第二沿）
-    bool    _cs_active_level;          // 缓存：CS 有效电平（1=高有效, 0=低有效）
+    polarity _cs_active_level;         // 缓存：CS 有效电平（Low / High）
     bool    _has_cs;
     bool    _initialized;
     volatile uint8_t _busy;

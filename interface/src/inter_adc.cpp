@@ -16,7 +16,7 @@ adc_port::adc_port(const AdcPortConfig &cfg)
       _initialized(false), _periph(0)
 {
     for (uint8_t i = 0; i < 8; i++) {
-        if (i < cfg.channel_count && cfg.channels[i].port != 0) {
+        if (i < cfg.channel_count && cfg.channels[i].port != port_none) {
             _ch_pins[i] = new (_ch_storage[i].data)
                 io_ctrl(cfg.channels[i].port, cfg.channels[i].pin);
         }
@@ -60,12 +60,12 @@ void adc_port::init()
 
     // GPIO: 模拟模式
     for (uint8_t i = 0; i < _cfg.channel_count && i < 8; i++) {
-        if (_ch_pins[i] == nullptr && _cfg.channels[i].port != 0) {
+        if (_ch_pins[i] == nullptr && _cfg.channels[i].port != port_none) {
             _ch_pins[i] = new (_ch_storage[i].data)
                 io_ctrl(_cfg.channels[i].port, _cfg.channels[i].pin);
         }
         if (_ch_pins[i]) {
-            _ch_pins[i]->init(GPIO_MODE_ANALOG, GPIO_PUPD_NONE);
+            _ch_pins[i]->init(mode_analog, nopull);
         }
     }
 

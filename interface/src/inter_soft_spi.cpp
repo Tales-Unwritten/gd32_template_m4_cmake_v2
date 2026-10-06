@@ -13,10 +13,10 @@ soft_spi_bus::soft_spi_bus(const SoftSpiConfig &cfg)
     , _mode(cfg.mode)
     , _bit_order(cfg.bit_order)
     , _delay_us(cfg.delay_us)
-    , _cpol((cfg.mode >> 1) & 0x01)     // CPOL：SCK 空闲电平
-    , _cpha(cfg.mode & 0x01)            // CPHA：采样沿
-    , _cs_active_level(cfg.cs_active_level == SET ? 1 : 0)
-    , _has_cs(cfg.cs_port != 0 && cfg.cs_pin != 0)
+    , _cpol((static_cast<uint8_t>(cfg.mode) >> 1) & 0x01)   // CPOL：SCK 空闲电平
+    , _cpha(static_cast<uint8_t>(cfg.mode) & 0x01)          // CPHA：采样沿
+    , _cs_active_level(cfg.cs_active_level)
+    , _has_cs(cfg.cs_port != port_none && cfg.cs_pin != pin_none)
     , _initialized(false)
     , _busy(0)
 {
@@ -37,20 +37,20 @@ void soft_spi_bus::init()
         return;   // 幂等
 
     // SCK: 推挽输出，先置空闲电平（= CPOL）
-    _sck.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _sck.init(mode_output, nopull, otype_pp, speed_high);
     _sck.set(_cpol ? true : false);
 
     // MOSI: 推挽输出
-    _mosi.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _mosi.init(mode_output, nopull, otype_pp, speed_high);
     _mosi.set(false);
 
     // MISO: 输入（从机驱动，无需上拉）
-    _miso.init(GPIO_MODE_INPUT, GPIO_PUPD_NONE);
+    _miso.init(mode_input, nopull);
 
     // CS: 推挽输出（可选），释放到无效电平
     if (_has_cs)
     {
-        _cs.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+        _cs.init(mode_output, nopull, otype_pp, speed_high);
         cs_deselect();
     }
 
@@ -98,7 +98,7 @@ void soft_spi_bus::_delay()
 uint8_t soft_spi_bus::_transfer_byte_core(uint8_t data)
 {
     uint8_t rx = 0;
-    bool    msb = (_bit_order == 0);
+    bool    msb = (_bit_order == MSB);
 
     for (uint8_t i = 0; i < 8; i++)
     {
@@ -113,7 +113,7 @@ uint8_t soft_spi_bus::_transfer_byte_core(uint8_t data)
         // 3. CPHA=0：第一沿采样 MISO
         bool rx_bit = false;
         if (!_cpha)
-            rx_bit = (_miso.read() == SET);
+            rx_bit = (_miso.read() == High);
 
         // 4. 第二沿（回到空闲电平）
         _sck.set(_cpol);
@@ -121,7 +121,7 @@ uint8_t soft_spi_bus::_transfer_byte_core(uint8_t data)
 
         // 5. CPHA=1：第二沿采样 MISO
         if (_cpha)
-            rx_bit = (_miso.read() == SET);
+            rx_bit = (_miso.read() == High);
 
         // 6. 移位（位序决定方向）
         if (msb)
@@ -171,14 +171,14 @@ void soft_spi_bus::cs_select()
 {
     if (!_has_cs || !_initialized)
         return;
-    _cs.set(_cs_active_level ? true : false);
+    _cs.write(_cs_active_level);   // 拉到有效电平
 }
 
 void soft_spi_bus::cs_deselect()
 {
     if (!_has_cs || !_initialized)
         return;
-    _cs.set(_cs_active_level ? false : true);
+    _cs.write(_cs_active_level == High ? Low : High);   // 恢复无效电平
 }
 
 // ============================================================
@@ -210,20 +210,20 @@ void soft_spi_bus::cs_deselect()
 //    传输循环中：CPHA=0 在 SCK 第一沿采样，CPHA=1 在第二沿采样。
 // ============================================================
 
-void soft_spi_bus::set_mode(uint8_t mode)
+void soft_spi_bus::set_mode(soft_mode_enum_t mode)
 {
     _mode  = mode;
-    _cpol  = (mode >> 1) & 0x01;
-    _cpha  = mode & 0x01;
+    _cpol  = (static_cast<uint8_t>(mode) >> 1) & 0x01;
+    _cpha  = static_cast<uint8_t>(mode) & 0x01;
 
     // 立即将 SCK 置于新模式的空闲电平
     if (_initialized)
         _sck.set(_cpol ? true : false);
 }
 
-void soft_spi_bus::set_bit_order(uint8_t order)
+void soft_spi_bus::set_bit_order(soft_order_enum_t order)
 {
-    _bit_order = order & 0x01;
+    _bit_order = order;
 }
 
 void soft_spi_bus::set_speed(uint8_t delay_us)

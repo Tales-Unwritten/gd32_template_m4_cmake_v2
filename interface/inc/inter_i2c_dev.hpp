@@ -2,12 +2,12 @@
 
 #ifdef __cplusplus
 
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 
 class inter_i2c_dev
 {
 public:
-    inter_i2c_dev(inter_i2c_bus *bus, uint8_t addr);
+    inter_i2c_dev(i2c_bus *bus, uint8_t addr);
 
     void     write_16bit(uint8_t reg, uint16_t data);
     uint16_t read_16bit(uint8_t reg);
@@ -24,7 +24,7 @@ public:
     /**
      * @brief SMBus 通用软复位：向保留地址 0x00 发 0x06 命令，
      *        支持 SMBus 软复位的设备会复位（如 EEPROM 卡死解锁）
-     * @note  总线级 9 脉冲恢复请用 inter_i2c_bus::bus_recovery()
+     * @note  总线级 9 脉冲恢复请用 i2c_bus::bus_recovery()
      */
     void softReset();
 
@@ -35,7 +35,7 @@ public:
     uint8_t lastError();
 
 private:
-    inter_i2c_bus *_bus;
+    i2c_bus *_bus;
     uint8_t _addr;
     uint8_t _err = 0;   // 0 = OK, 1 = NACK / 总线错误
 };

@@ -13,10 +13,10 @@ enum class dac_id : uint8_t { dac0 };
 
 struct DacPortConfig {
     dac_id   periph;           ///< DAC0
-    uint32_t out0_port;        ///< PA4（0=不用此通道）
-    uint32_t out0_pin;
-    uint32_t out1_port;        ///< PA5（0=不用此通道）
-    uint32_t out1_pin;
+    port_enum_t out0_port = port_none;  ///< PA4（port_none=不用此通道）
+    pin_enum_t  out0_pin  = pin_none;
+    port_enum_t out1_port = port_none;  ///< PA5（port_none=不用此通道）
+    pin_enum_t  out1_pin  = pin_none;
     uint32_t trigger;          ///< DAC_TRIGGER_SOFTWARE / EXTERNAL_TRIGGER_DISABLE
     uint32_t vref_mv;          ///< 参考电压 mV（默认 3300）
 };
@@ -25,7 +25,7 @@ struct DacPortConfig {
  * @brief DAC 端口（双通道电压输出）
  *
  *   static dac_port dac({
- *       dac_id::dac0, 0, 0, GPIOA, GPIO_PIN_5,
+ *       dac_id::dac0, port_none, pin_none, portA, pin5,
  *       EXTERNAL_TRIGGER_DISABLE, 3300
  *   });
  *   dac.init();

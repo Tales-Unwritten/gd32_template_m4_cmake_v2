@@ -26,8 +26,8 @@ spi_port::spi_port(const SpiPortConfig &cfg)
     , _sck(cfg.sck_port, cfg.sck_pin)
     , _mosi(cfg.mosi_port, cfg.mosi_pin)
     , _miso(cfg.miso_port, cfg.miso_pin)
-    , _cs(cfg.cs_port ? cfg.cs_port : GPIOA, cfg.cs_pin ? cfg.cs_pin : GPIO_PIN_0)
-    , _has_cs(cfg.cs_port != 0 && cfg.cs_pin != 0)
+    , _cs(cfg.cs_port != port_none ? cfg.cs_port : portA, cfg.cs_pin != pin_none ? cfg.cs_pin : pin0)
+    , _has_cs(cfg.cs_port != port_none && cfg.cs_pin != pin_none)
     , _initialized(false)
     , _periph(0)
 {
@@ -77,18 +77,18 @@ void spi_port::init()
 
     // GPIO: SCK, MOSI, MISO → AF 推挽输出
     // MISO 虽然是输入，但 AF 模式下 gpio_init 自动处理方向
-    _sck.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _sck.init(mode_af, nopull, otype_pp, speed_high);
     _sck.set_af(_cfg.af);
 
-    _mosi.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _mosi.init(mode_af, nopull, otype_pp, speed_high);
     _mosi.set_af(_cfg.af);
 
-    _miso.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _miso.init(mode_af, nopull, otype_pp, speed_high);
     _miso.set_af(_cfg.af);
 
     // CS → 普通推挽输出（非 AF），初始释放
     if (_has_cs) {
-        _cs.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+        _cs.init(mode_output, nopull, otype_pp, speed_high);
         cs_deselect();
     }
 
@@ -180,7 +180,7 @@ void spi_port::cs_select()
 {
     if (!_has_cs) return;
 
-    if (_cfg.cs_active_level == (uint32_t)SET) {
+    if (_cfg.cs_active_level == High) {
         _cs.high();
     } else {
         _cs.low();
@@ -191,7 +191,7 @@ void spi_port::cs_deselect()
 {
     if (!_has_cs) return;
 
-    if (_cfg.cs_active_level == (uint32_t)SET) {
+    if (_cfg.cs_active_level == High) {
         _cs.low();
     } else {
         _cs.high();

@@ -57,7 +57,7 @@ uint8_t exti_port::_resolve_line() const
 {
     if (_cfg.line_type == exti_line_id::gpio)
     {
-        if (_cfg.pin == 0) return 0xFF;   // 无效引脚
+        if (_cfg.pin == pin_none) return 0xFF;   // 无效引脚
 
         // pin 是一个 bit，找到它是第几位（0~15）
         uint32_t p = _cfg.pin;
@@ -79,15 +79,15 @@ void exti_port::_config_syscfg()
 
     // 端口 → EXTI_SOURCE_GPIOx
     uint8_t port_src = 0;
-    if      (_cfg.port == GPIOA) port_src = EXTI_SOURCE_GPIOA;
-    else if (_cfg.port == GPIOB) port_src = EXTI_SOURCE_GPIOB;
-    else if (_cfg.port == GPIOC) port_src = EXTI_SOURCE_GPIOC;
-    else if (_cfg.port == GPIOD) port_src = EXTI_SOURCE_GPIOD;
-    else if (_cfg.port == GPIOE) port_src = EXTI_SOURCE_GPIOE;
-    else if (_cfg.port == GPIOF) port_src = EXTI_SOURCE_GPIOF;
-    else if (_cfg.port == GPIOG) port_src = EXTI_SOURCE_GPIOG;
-    else if (_cfg.port == GPIOH) port_src = EXTI_SOURCE_GPIOH;
-    else if (_cfg.port == GPIOI) port_src = EXTI_SOURCE_GPIOI;
+    if      (_cfg.port == portA) port_src = EXTI_SOURCE_GPIOA;
+    else if (_cfg.port == portB) port_src = EXTI_SOURCE_GPIOB;
+    else if (_cfg.port == portC) port_src = EXTI_SOURCE_GPIOC;
+    else if (_cfg.port == portD) port_src = EXTI_SOURCE_GPIOD;
+    else if (_cfg.port == portE) port_src = EXTI_SOURCE_GPIOE;
+    else if (_cfg.port == portF) port_src = EXTI_SOURCE_GPIOF;
+    else if (_cfg.port == portG) port_src = EXTI_SOURCE_GPIOG;
+    else if (_cfg.port == portH) port_src = EXTI_SOURCE_GPIOH;
+    else if (_cfg.port == portI) port_src = EXTI_SOURCE_GPIOI;
     else { assert(0); return; }   // 非法端口
 
     uint8_t pin_src = _line;  // EXTI_SOURCE_PIN0 ~ PIN15 = 0~15
@@ -139,7 +139,7 @@ bool exti_port::init()
 
     if (_cfg.line_type == exti_line_id::gpio)
     {
-        _pin.init(GPIO_MODE_INPUT, _cfg.pull);
+        _pin.init(mode_input, _cfg.pull);
         _config_syscfg();
     }
 

@@ -32,10 +32,10 @@ enum class exti_line_id : uint8_t {
 
 struct ExtiConfig {
     exti_line_id  line_type = exti_line_id::gpio;
-    uint32_t      port      = 0;   ///< GPIOA~GPIOI（仅 gpio 线）
-    uint32_t      pin       = 0;   ///< GPIO_PIN_0 ~ GPIO_PIN_15（仅 gpio 线）
+    port_enum_t   port      = port_none;  ///< portA~portI（仅 gpio 线）
+    pin_enum_t    pin       = pin_none;   ///< pin0 ~ pin15（仅 gpio 线）
     exti_trigger  trigger  = exti_trigger::rising;  ///< 触发沿（仅 gpio 线；系统线硬件固定上升沿）
-    uint8_t       pull     = GPIO_PUPD_NONE;        ///< 上/下拉（仅 gpio 线，按键场景用 PULLUP）
+    pull_enum_t   pull     = nopull;      ///< 上/下拉（仅 gpio 线，按键场景用 pullup）
     uint8_t       priority = 5;                     ///< NVIC 优先级 0~15（0 为最高抢占级，默认 5）
 };
 
@@ -43,9 +43,9 @@ struct ExtiConfig {
  * @brief 外部中断（EXTI）—— 全 23 线支持
  *
  *   // GPIO 线：按键下降沿 + 内部上拉
- *   static exti_port btn({.port = GPIOA, .pin = GPIO_PIN_0,
+ *   static exti_port btn({.port = portA, .pin = pin0,
  *                         .trigger = exti_trigger::falling,
- *                         .pull = GPIO_PUPD_PULLUP});
+ *                         .pull = pullup});
  *   if (btn.init()) {                 // false = 线被占用
  *       btn.on_interrupt([](void*) { led.toggle(); });
  *       btn.enable();

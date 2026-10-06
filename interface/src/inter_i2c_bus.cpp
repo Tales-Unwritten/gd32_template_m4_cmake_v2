@@ -1,12 +1,50 @@
 #include "inter_i2c_bus.hpp"
 #include "link.h"
+#include "gd32f4xx.h"   // DWT / CoreDebug（自标定用）
+
+// ============================================================
+//  "一次忙等循环"的 CPU 周期数
+//    方案①（默认）：DWT 上电自标定 —— 与优化级别无关，最准
+//    方案②（备用）：无 DWT 的平台把 #if 改为 0，用下面的固定值
+// ============================================================
+static uint32_t _measure_loop_cycles(void)
+{
+    static uint32_t cached = 0;
+    if (cached) return cached;
+
+#if 1   /* 方案①：DWT 自标定 */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
+
+    const uint32_t N = 1000U, ITER = 1000U;
+    uint32_t t0 = DWT->CYCCNT;
+    for (uint32_t i = 0; i < N; i++)
+    {
+        volatile uint32_t c = ITER;
+        while (c--) { }
+    }
+    uint32_t per = (DWT->CYCCNT - t0) / (N * ITER);
+    cached = (per != 0U) ? per : 5U;   // 测得为 0 时兜底
+#else   /* 方案②：固定值（无 DWT 的平台；需实测标定） */
+    cached = 5U;                        // GD32F470 @240MHz,-O2 实测约 5 周期/次
+#endif
+    return cached;
+}
+
 // ============================================================
 //  构造函数：通过初始化列表构建 io_ctrl 对象
 // ============================================================
 
-inter_i2c_bus::inter_i2c_bus(const I2C_Bus_Info_t &cfg, uint8_t delay_us)
-    : _scl(cfg.PORT_SCL, cfg.SCL), _sda(cfg.PORT_SDA, cfg.SDA), _delay_val(delay_us), _busy(0)
+inter_i2c_bus::inter_i2c_bus(const I2C_Bus_Info_t &cfg)
+    : _scl(cfg.PORT_SCL, cfg.SCL),
+      _sda(cfg.PORT_SDA, cfg.SDA),
+      _delay_count(0),
+      _busy(0)
 {
+    // 半周期忙等循环次数 = sys_clk / (clock_speed * 2 * 每循环周期)
+    const uint32_t rate = (cfg.clock_speed != 0U) ? cfg.clock_speed : 400000U;   // 防 0 除
+    _delay_count = cfg.sys_clk_hz / (rate * 2U * _measure_loop_cycles());
 }
 
 // ============================================================
@@ -16,10 +54,10 @@ inter_i2c_bus::inter_i2c_bus(const I2C_Bus_Info_t &cfg, uint8_t delay_us)
 void inter_i2c_bus::init()
 {
     // SCL: 开漏输出，上拉，高速
-    _scl.init(GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ);
+    _scl.init(mode_output, pullup, otype_od, speed_high);
 
     // SDA: 开漏输出，上拉，高速
-    _sda.init(GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ);
+    _sda.init(mode_output, pullup, otype_od, speed_high);
 
     // 释放总线：SCL = 1, SDA = 1
     _write_scl(1);
@@ -39,7 +77,8 @@ void inter_i2c_bus::deinit()
 
 void inter_i2c_bus::_delay()
 {
-    delay_us(_delay_val);
+    volatile uint32_t n = _delay_count;   // volatile：防 -O2 优化为空
+    while (n--) { }
 }
 
 // ============================================================
@@ -66,7 +105,7 @@ void inter_i2c_bus::_write_sda(uint8_t BitValue)
     _delay();
 }
 
-FlagStatus inter_i2c_bus::_read_sda()
+polarity inter_i2c_bus::_read_sda()
 {
     return _sda.read();
 }
@@ -137,30 +176,30 @@ uint8_t inter_i2c_bus::read_byte()
     for (uint8_t i = 0; i < 8; i++)
     {
         _write_scl(1);
-        if (_read_sda() == SET)
+        if (_read_sda() == High)
             ByteValue |= (0x80 >> i);
         _write_scl(0);
     }
     return ByteValue;
 }
 
-uint8_t inter_i2c_bus::wait_ack(uint16_t timeout)
+bool inter_i2c_bus::wait_ack(uint16_t timeout)
 {
     // 释放 SDA，等待从机拉低
     _write_sda(1);
     _write_scl(1);
 
-    while (_read_sda() == SET)
+    while (_read_sda() == High)
     {
         if (--timeout == 0)
         {
             _write_scl(0);
-            return 0; // 超时，无应答
+            return false; // 超时，无应答
         }
     }
 
     _write_scl(0);
-    return 1; // 收到应答
+    return true; // 收到应答
 }
 
 void inter_i2c_bus::write_ack(uint8_t AckValue)
@@ -194,7 +233,7 @@ void inter_i2c_bus::unlock()
     _busy = 0;
 }
 
-uint8_t inter_i2c_bus::is_busy()
+uint8_t inter_i2c_bus::is_busy() const
 {
     return _busy;
 }

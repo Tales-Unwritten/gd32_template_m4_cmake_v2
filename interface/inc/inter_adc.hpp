@@ -20,8 +20,8 @@ enum class adc_id : uint8_t { adc0, adc1, adc2 };
 // ============================================================
 
 struct AdcChannelConfig {
-    uint32_t port        = 0;   ///< GPIO 端口（0 = 不配置引脚，仅选通道号）
-    uint32_t pin         = 0;   ///< 引脚掩码
+    port_enum_t port        = port_none;  ///< GPIO 端口（port_none = 不配置引脚，仅选通道号）
+    pin_enum_t  pin         = pin_none;   ///< 引脚（pin0~pin15）
     uint32_t channel     = 0;   ///< ADC 通道号: ADC_CHANNEL_0 ~ ADC_CHANNEL_18
     uint32_t sample_time = ADC_SAMPLETIME_144;  ///< 本通道采样时间: ADC_SAMPLETIME_3 ~ _480
 };
@@ -39,7 +39,7 @@ struct AdcPortConfig {
     uint32_t          clock_div        = ADC_ADCCK_PCLK2_DIV4; ///< ADC 时钟分频（3 个 ADC 共享，默认 120M/4=30MHz）
     bool              scan_enable      = false;  ///< 硬件扫描模式（多通道一次序列转换，对齐参考实现）
     bool              enable_temp_vref = false;  ///< 使能温度传感器(CH16)/内部参考(CH17)通道
-    AdcChannelConfig  channels[8]      = {};     ///< 通道列表（port=0 结束）
+    AdcChannelConfig  channels[8]      = {};     ///< 通道列表（port=port_none 结束）
     uint8_t           channel_count    = 0;      ///< 1~8
 
     // ── DMA 模式（对齐官方例程 ADC0_routine_sequence_with_DMA：连续转换 + DMA 循环搬运） ──
@@ -63,8 +63,8 @@ struct AdcPortConfig {
  *
  *   static adc_port adc({
  *       .periph = adc_id::adc0,
- *       .channels = {{{GPIOA, GPIO_PIN_0, ADC_CHANNEL_0, ADC_SAMPLETIME_144},
- *                     {GPIOB, GPIO_PIN_3, ADC_CHANNEL_3, ADC_SAMPLETIME_144}}},
+ *       .channels = {{{portA, pin0, ADC_CHANNEL_0, ADC_SAMPLETIME_144},
+ *                     {portB, pin3, ADC_CHANNEL_3, ADC_SAMPLETIME_144}}},
  *       .channel_count = 2,
  *       .scan_enable = true,          // 硬件扫描模式
  *   });

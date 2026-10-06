@@ -35,20 +35,20 @@ enum class spi_id : uint8_t {
  *   clock_polarity_phase: SPI_CK_PL_LOW_PH_1EDGE ~ SPI_CK_PL_HIGH_PH_2EDGE
  *   frame_format:   SPI_ENDIAN_MSB / SPI_ENDIAN_LSB
  *   frame_size:     SPI_FRAMESIZE_8BIT / SPI_FRAMESIZE_16BIT
- *   cs_active_level: RESET（低有效）或 SET（高有效）
+ *   cs_active_level: polarity（Low=低有效 / High=高有效）
  */
 struct SpiPortConfig {
     spi_id   periph;              ///< 外设 ID
-    uint32_t sck_port;            ///< SCK GPIO 端口
-    uint32_t sck_pin;             ///< SCK 引脚掩码
-    uint32_t mosi_port;           ///< MOSI GPIO 端口
-    uint32_t mosi_pin;            ///< MOSI 引脚掩码
-    uint32_t miso_port;           ///< MISO GPIO 端口
-    uint32_t miso_pin;            ///< MISO 引脚掩码
-    uint32_t cs_port;             ///< CS GPIO 端口（0 = 不使用软件 CS）
-    uint32_t cs_pin;              ///< CS 引脚掩码（0 = 不使用软件 CS）
-    uint32_t cs_active_level;     ///< CS 有效电平: GPIO_PIN_SET 或 GPIO_PIN_RESET
-    uint32_t af;                  ///< 复用功能编号（SPI0/1/2 通常为 GPIO_AF_5）
+    port_enum_t sck_port;         ///< SCK GPIO 端口（portA~portI）
+    pin_enum_t  sck_pin;          ///< SCK 引脚（pin0~pin15）
+    port_enum_t mosi_port;        ///< MOSI GPIO 端口（portA~portI）
+    pin_enum_t  mosi_pin;         ///< MOSI 引脚（pin0~pin15）
+    port_enum_t miso_port;        ///< MISO GPIO 端口（portA~portI）
+    pin_enum_t  miso_pin;         ///< MISO 引脚（pin0~pin15）
+    port_enum_t cs_port = port_none; ///< CS GPIO 端口（port_none = 不使用软件 CS）
+    pin_enum_t  cs_pin  = pin_none;  ///< CS 引脚（pin_none = 不使用软件 CS）
+    polarity    cs_active_level = Low; ///< CS 有效电平: Low（低有效）/ High（高有效）
+    af_enum_t   af;               ///< 复用功能编号（af0~af15，SPI0/1/2 通常为 af5）
     uint32_t prescaler;           ///< SPI_PSC_2 ~ SPI_PSC_256
     uint32_t clock_polarity_phase;///< SPI_CK_PL_LOW_PH_1EDGE ~ SPI_CK_PL_HIGH_PH_2EDGE
     uint32_t frame_format;        ///< SPI_FRAMEFORMAT_MSB / SPI_FRAMEFORMAT_LSB
@@ -64,9 +64,9 @@ struct SpiPortConfig {
  *
  * 使用示例（单设备，自动 CS 控制）：
  *   static spi_port flash({
- *       spi_id::spi4, GPIOF, GPIO_PIN_7, GPIOF, GPIO_PIN_9,
- *       GPIOF, GPIO_PIN_8, GPIOF, GPIO_PIN_6, GPIO_PIN_RESET,
- *       GPIO_AF_5, SPI_PSC_4, SPI_CK_PL_HIGH_PH_2EDGE,
+ *       spi_id::spi4, portF, pin7, portF, pin9,
+ *       portF, pin8, portF, pin6, Low,
+ *       af5, SPI_PSC_4, SPI_CK_PL_HIGH_PH_2EDGE,
  *       SPI_FRAMEFORMAT_MSB, SPI_FRAMESIZE_8BIT
  *   });
  *   flash.init();

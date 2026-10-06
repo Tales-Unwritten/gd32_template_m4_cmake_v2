@@ -61,7 +61,7 @@ bool can_port::init()
     if (_initialized) return true;
 
     // 参数校验
-    if (_cfg.tx_port == 0 || _cfg.tx_pin == 0 || _cfg.rx_port == 0 || _cfg.rx_pin == 0)
+    if (_cfg.tx_port == port_none || _cfg.tx_pin == pin_none || _cfg.rx_port == port_none || _cfg.rx_pin == pin_none)
         return false;
     if (_cfg.baudrate == 0)
         return false;
@@ -76,9 +76,9 @@ bool can_port::init()
     _enable_clock();
 
     // GPIO AF（CAN 引脚标准无上拉）
-    _tx.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _tx.init(mode_af, nopull, otype_pp, speed_high);
     _tx.set_af(_cfg.af);
-    _rx.init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+    _rx.init(mode_af, nopull, otype_pp, speed_high);
     _rx.set_af(_cfg.af);
 
     // ── 时序参数（对齐参考实现：保证整除，波特率精确） ──

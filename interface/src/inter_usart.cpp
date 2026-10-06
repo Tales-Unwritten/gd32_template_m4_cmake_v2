@@ -1,22 +1,21 @@
 #include "inter_usart.hpp"
 
-#include "gd32f4xx.h"
-#include "gd32f4xx_rcu.h"
-#include "gd32f4xx_usart.h"
-#include "gd32f4xx_misc.h"
-
-#include <new>
-#include <cstring>
+// 本编译单元仅保留非模板内容：
+//   - 全局端口表 g_port_map[]（基类指针）
+//   - 注册/注销自由函数（usart_port_register / usart_port_unregister）
+//   - 通用 ISR 处理与各 USARTx_IRQHandler
+// 模板类 usart_port<RX_BUF_SIZE> 的成员定义内联于 inter_usart.hpp。
 
 // ============================================================
 //  文件内全局：端口映射表（ISR 通过它找到对应实例）
+//  表项为基类指针，硬件串口 usart_port<RX> 实例注册到此处。
 // ============================================================
 
 namespace {
 
 constexpr uint8_t UART_MAX = 8;
 
-usart_port *g_port_map[UART_MAX] = {};
+usart_port_base *g_port_map[UART_MAX] = {};
 
 uint8_t _port_index(uint32_t periph)
 {
@@ -37,209 +36,29 @@ uint8_t _port_index(uint32_t periph)
 } // anonymous namespace
 
 // ============================================================
-//  注册 / 注销
+//  注册 / 注销（非模板自由函数，供模板成员调用）
 // ============================================================
 
-void usart_port::_register_port()
+void usart_port_register(usart_port_base *port)
 {
-    uint8_t idx = _port_index(_cfg.usart_periph);
-    if (idx < UART_MAX) g_port_map[idx] = this;
+    if (!port) return;
+    uint8_t idx = _port_index(port->periph());
+    if (idx < UART_MAX) g_port_map[idx] = port;
 }
 
-void usart_port::_unregister_port()
+void usart_port_unregister(usart_port_base *port)
 {
-    uint8_t idx = _port_index(_cfg.usart_periph);
-    if (idx < UART_MAX) g_port_map[idx] = nullptr;
-}
-
-// ============================================================
-//  构造 / 析构
-// ============================================================
-
-usart_port::usart_port(const UsartPortConfig &cfg)
-    : _cfg(cfg),
-      _tx(cfg.tx_port, cfg.tx_pin),
-      _rx(cfg.rx_port, cfg.rx_pin),
-      _initialized(false),
-      _rx_heap_buf(nullptr),
-      _rx_buf_size(0),
-      _buf{}
-{
-}
-
-usart_port::~usart_port()
-{
-    deinit();
-}
-
-// ============================================================
-//  外设映射
-// ============================================================
-
-void usart_port::_enable_clock()
-{
-    const auto p = _cfg.usart_periph;
-    if      (p == USART0) rcu_periph_clock_enable(RCU_USART0);
-    else if (p == USART1) rcu_periph_clock_enable(RCU_USART1);
-    else if (p == USART2) rcu_periph_clock_enable(RCU_USART2);
-    else if (p == UART3)  rcu_periph_clock_enable(RCU_UART3);
-    else if (p == UART4)  rcu_periph_clock_enable(RCU_UART4);
-    else if (p == USART5) rcu_periph_clock_enable(RCU_USART5);
-    else if (p == UART6)  rcu_periph_clock_enable(RCU_UART6);
-    else if (p == UART7)  rcu_periph_clock_enable(RCU_UART7);
-}
-
-IRQn_Type usart_port::_get_irq() const
-{
-    const auto p = _cfg.usart_periph;
-    if      (p == USART0) return USART0_IRQn;
-    else if (p == USART1) return USART1_IRQn;
-    else if (p == USART2) return USART2_IRQn;
-    else if (p == UART3)  return UART3_IRQn;
-    else if (p == UART4)  return UART4_IRQn;
-    else if (p == USART5) return USART5_IRQn;
-    else if (p == UART6)  return UART6_IRQn;
-    else if (p == UART7)  return UART7_IRQn;
-    return USART0_IRQn;
-}
-
-// ============================================================
-//  init / deinit
-// ============================================================
-
-void usart_port::init()
-{
-    if (_initialized) return;
-
-    // [LEGACY] 堆分配缓冲区 - 历史遗留代码
-    // 新外设应使用 usart_async_port 模板类（零堆分配）
-    _rx_buf_size = _cfg.rx_buf_size;
-    _rx_heap_buf = new (std::nothrow) uint8_t[_rx_buf_size];
-    if (!_rx_heap_buf) return;
-
-    // 绑定 buffer 视图
-    _buf.rx_buf  = _rx_heap_buf;
-    _buf.rx_len  = 0;
-    _buf.rx_flag = 0;
-    _buf.tx_busy = 0;
-
-    // 时钟
-    _enable_clock();
-
-    // GPIO
-    _tx.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-    _tx.set_af(_cfg.af);
-    _rx.init(GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
-    _rx.set_af(_cfg.af);
-
-    // USART 8N1
-    usart_deinit(_cfg.usart_periph);
-    usart_baudrate_set(_cfg.usart_periph, _cfg.baudrate);
-    usart_parity_config(_cfg.usart_periph, USART_PM_NONE);
-    usart_word_length_set(_cfg.usart_periph, USART_WL_8BIT);
-    usart_stop_bit_set(_cfg.usart_periph, USART_STB_1BIT);
-
-    // 中断：RXNE + IDLE + ERR
-    nvic_irq_enable(_get_irq(), 0, 0);
-    usart_interrupt_enable(_cfg.usart_periph, USART_INT_RBNE);
-    usart_interrupt_enable(_cfg.usart_periph, USART_INT_IDLE);
-    usart_interrupt_enable(_cfg.usart_periph, USART_INT_ERR);
-
-    // 使能 USART
-    usart_enable(_cfg.usart_periph);
-    usart_transmit_config(_cfg.usart_periph, USART_TRANSMIT_ENABLE);
-    usart_receive_config(_cfg.usart_periph, USART_RECEIVE_ENABLE);
-
-    _register_port();
-    _initialized = true;
-}
-
-void usart_port::deinit()
-{
-    if (!_initialized) return;
-
-    _unregister_port();
-
-    nvic_irq_disable(_get_irq());
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_RBNE);
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_IDLE);
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_ERR);
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_TBE);
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_TC);
-
-    usart_disable(_cfg.usart_periph);
-    usart_deinit(_cfg.usart_periph);
-
-    _tx.deinit();
-    _rx.deinit();
-
-    delete[] _rx_heap_buf;
-    _rx_heap_buf = nullptr;
-    _buf.rx_buf  = nullptr;
-    _buf.rx_len  = 0;
-    _buf.rx_flag = 0;
-    _buf.tx_busy = 0;
-
-    _initialized = false;
-}
-
-// ============================================================
-//  阻塞发送（超时保护）
-// ============================================================
-
-bool usart_port::send_data(const uint8_t *data, uint16_t len)
-{
-    if (!_initialized || !data || len == 0) return false;
-
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_TBE);
-    usart_interrupt_disable(_cfg.usart_periph, USART_INT_TC);
-
-    for (uint16_t i = 0; i < len; ++i)
-    {
-        uint32_t timeout = 0xFFFF;
-        while (RESET == usart_flag_get(_cfg.usart_periph, USART_FLAG_TBE))
-        {
-            if (--timeout == 0) return false;   // 超时，防止硬件异常挂死
-        }
-        usart_data_transmit(_cfg.usart_periph, data[i]);
-    }
-    {
-        uint32_t timeout = 0xFFFF;
-        while (RESET == usart_flag_get(_cfg.usart_periph, USART_FLAG_TC))
-        {
-            if (--timeout == 0) return false;   // 超时，防止硬件异常挂死
-        }
-    }
-    return true;
-}
-
-// ============================================================
-//  中断发送（内部拷贝，安全）
-// ============================================================
-
-bool usart_port::send_data_it(const uint8_t *data, uint16_t len)
-{
-    if (!_initialized || !data || len == 0) return false;
-    if (_buf.tx_busy) return false;            // 正在发送中
-    if (len > TX_BUF_SIZE) return false;        // 内部缓冲区不足
-
-    // 内部拷贝：防止用户释放缓冲区后 ISR 访问野指针
-    memcpy(_tx_buf, data, len);
-    _buf.tx_data = _tx_buf;                    // 指向内部缓冲区
-    _buf.tx_len  = len;
-    _buf.tx_idx  = 0;
-    _buf.tx_busy = 1;
-
-    usart_interrupt_enable(_cfg.usart_periph, USART_INT_TBE);
-    usart_interrupt_enable(_cfg.usart_periph, USART_INT_TC);
-    return true;
+    if (!port) return;
+    uint8_t idx = _port_index(port->periph());
+    if (idx < UART_MAX && g_port_map[idx] == port) g_port_map[idx] = nullptr;
 }
 
 // ============================================================
 //  通用 ISR 处理函数（由各 USARTx_IRQHandler 调用）
+//  全程通过基类虚接口访问，与具体模板实例无关。
 // ============================================================
 
-static void _uart_isr(usart_port *port)
+static void _uart_isr(usart_port_base *port)
 {
     if (!port || !port->is_initialized()) return;
 

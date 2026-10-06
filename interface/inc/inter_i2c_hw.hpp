@@ -9,6 +9,7 @@
 #ifdef __cplusplus
 
 #include <cstdint>
+#include "inter_i2c.hpp"
 #include "inter_io_ctrl.hpp"
 #include "gd32f4xx.h"       // [PORT] 替换为目标 SDK 头文件
 
@@ -23,12 +24,12 @@ enum class i2c_hw_id : uint8_t { i2c0, i2c1, i2c2 };
 // ============================================================
 
 struct I2cHwConfig {
-    i2c_hw_id periph;      ///< 外设 ID
-    uint32_t  scl_port;    ///< SCL GPIO 端口
-    uint32_t  scl_pin;     ///< SCL 引脚掩码
-    uint32_t  sda_port;    ///< SDA GPIO 端口
-    uint32_t  sda_pin;     ///< SDA 引脚掩码
-    uint32_t  af;          ///< 复用功能编号（I2C0/1/2 通常 AF4）
+    i2c_hw_id  periph;      ///< 外设 ID
+    port_enum_t scl_port;   ///< SCL GPIO 端口（portA~portI）
+    pin_enum_t  scl_pin;    ///< SCL 引脚（pin0~pin15）
+    port_enum_t sda_port;   ///< SDA GPIO 端口（portA~portI）
+    pin_enum_t  sda_pin;    ///< SDA 引脚（pin0~pin15）
+    af_enum_t   af;         ///< 复用功能编号（af0~af15，I2C0/1/2 通常 af4）
     uint32_t  clock_speed; ///< 时钟速度: 100000 (标准) 或 400000 (快速)
 };
 
@@ -43,8 +44,8 @@ struct I2cHwConfig {
  * inter_i2c_dev 可以通过组合此对象来使用硬件 I2C。
  *
  * 总线级使用示例：
- *   i2c_hw_port bus({i2c_hw_id::i2c0, GPIOB, GPIO_PIN_6,
- *                     GPIOB, GPIO_PIN_7, GPIO_AF_4, 400000});
+ *   i2c_hw_bus bus({i2c_hw_id::i2c0, portB, pin6,
+ *                     portB, pin7, af4, 400000});
  *   bus.init();
  *   bus.start();
  *   bus.write_byte(0xA0);     // 设备地址 (写)
@@ -62,33 +63,41 @@ struct I2cHwConfig {
  *   bus.i2c_write_reg(0x50, 0x00, tx_data, 2);
  *   bus.i2c_read_reg(0x50, 0x00, rx_data, 2);
  */
-class i2c_hw_port {
+class i2c_hw_bus : public i2c_bus {
 public:
-    explicit i2c_hw_port(const I2cHwConfig &cfg);
-    ~i2c_hw_port();
+    explicit i2c_hw_bus(const I2cHwConfig &cfg);
+    ~i2c_hw_bus();
 
-    i2c_hw_port(const i2c_hw_port &) = delete;
-    i2c_hw_port &operator=(const i2c_hw_port &) = delete;
+    i2c_hw_bus(const i2c_hw_bus &) = delete;
+    i2c_hw_bus &operator=(const i2c_hw_bus &) = delete;
 
     // ── 生命周期 ──────────────────────────────────────────
-    void init();
-    void deinit();
+    void init() override;
+    void deinit() override;
     [[nodiscard]] bool is_initialized() const noexcept { return _initialized; }
 
     // 总线控制（兼容 inter_i2c_bus 接口） ──────────────
 
-    void    start();        ///< 起始条件（等待总线空闲）
-    void    i2c_restart();      ///< 重复起始条件（不等待空闲，总线已占有）
-    void    stop();
-    void    write_byte(uint8_t data);
-    uint8_t read_byte();
-    bool    wait_ack(uint16_t timeout = 1000);
-    void    write_ack(uint8_t ack);    // 0=ACK, 1=NACK
+    void    start() override;        ///< 起始条件（等待总线空闲）
+    void    i2c_restart();      ///< 重复起始条件（不等待空闲，总线已占有，平台扩展）
+    void    stop() override;
+    void    write_byte(uint8_t data) override;
+    uint8_t read_byte() override;
+    bool    wait_ack(uint16_t timeout = 1000) override;
+    void    write_ack(uint8_t ack) override;    // 0=ACK, 1=NACK
+
+    /** @brief 连续接收 len 字节并结束本次读传输（末字节 NACK + STOP）
+     *  GD32 F4 时序：末字节前 NACK，末尾 STOP + 恢复 ACK。
+     *  调用方不要再调 stop()。 */
+    void    read_bytes(uint8_t *buf, uint16_t len) override;
+
+    /** @brief 从机卡死时手动发 9 时钟 + STOP 恢复总线 */
+    void    bus_recovery() override;
 
     // ── 互斥 ──────────────────────────────────────────────
-    void    lock();
-    void    unlock();
-    [[nodiscard]] uint8_t is_busy() const { return _busy; }
+    void    lock() override;
+    void    unlock() override;
+    [[nodiscard]] uint8_t is_busy() const override { return _busy; }
 
     // ── 设备级便利方法（基于总线操作实现） ───────────────
 
@@ -105,6 +114,7 @@ public:
 
 private:
     void _enable_clock();
+    void _configure_peripheral();
     void _wait_flag(i2c_flag_enum flag);
 
     I2cHwConfig    _cfg;

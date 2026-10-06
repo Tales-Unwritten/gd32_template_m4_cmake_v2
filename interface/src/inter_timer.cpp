@@ -136,7 +136,7 @@ timer_port::timer_port(const TimerPortConfig &cfg)
     uint8_t count = (cfg.channel_count > 4) ? 4 : cfg.channel_count;
     for (uint8_t i = 0; i < count; i++)
     {
-        if (cfg.channels[i].port != 0)
+        if (cfg.channels[i].port != port_none)
         {
             _ch_pins[i] = new (_ch_storage[i].data) io_ctrl(cfg.channels[i].port, cfg.channels[i].pin);
         }
@@ -303,7 +303,7 @@ void timer_port::init()
     // GPIO AF 初始化
     for (uint8_t i = 0; i < _cfg.channel_count && i < 4; i++)
     {
-        if (_cfg.channels[i].port == 0)
+        if (_cfg.channels[i].port == port_none)
             continue;
 
         // deinit 后重建：_ch_pins[i] 已被销毁为 nullptr
@@ -312,7 +312,7 @@ void timer_port::init()
             _ch_pins[i] = new (_ch_storage[i].data) io_ctrl(_cfg.channels[i].port, _cfg.channels[i].pin);
         }
 
-        _ch_pins[i]->init(GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ);
+        _ch_pins[i]->init(mode_af, nopull, otype_pp, speed_high);
         _ch_pins[i]->set_af(_cfg.channels[i].af);
 
         // PWM 输出配置

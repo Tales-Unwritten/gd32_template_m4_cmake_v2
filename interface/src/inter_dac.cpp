@@ -10,9 +10,9 @@
 
 dac_port::dac_port(const DacPortConfig &cfg)
     : _cfg(cfg)
-    , _out0(cfg.out0_port ? cfg.out0_port : GPIOA, cfg.out0_pin ? cfg.out0_pin : GPIO_PIN_0)
-    , _out1(cfg.out1_port ? cfg.out1_port : GPIOA, cfg.out1_pin ? cfg.out1_pin : GPIO_PIN_0)
-    , _has_ch{cfg.out0_port != 0, cfg.out1_port != 0}
+    , _out0(cfg.out0_port != port_none ? cfg.out0_port : portA, cfg.out0_pin != pin_none ? cfg.out0_pin : pin0)
+    , _out1(cfg.out1_port != port_none ? cfg.out1_port : portA, cfg.out1_pin != pin_none ? cfg.out1_pin : pin0)
+    , _has_ch{cfg.out0_port != port_none, cfg.out1_port != port_none}
     , _initialized(false)
     , _periph(0)
 {}
@@ -32,10 +32,10 @@ void dac_port::init()
 
     // GPIO 模拟模式
     if (_has_ch[0]) {
-        _out0.init(GPIO_MODE_ANALOG, GPIO_PUPD_NONE);
+        _out0.init(mode_analog, nopull);
     }
     if (_has_ch[1]) {
-        _out1.init(GPIO_MODE_ANALOG, GPIO_PUPD_NONE);
+        _out1.init(mode_analog, nopull);
     }
 
     // 初始化两个通道

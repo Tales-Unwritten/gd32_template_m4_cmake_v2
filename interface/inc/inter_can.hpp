@@ -25,11 +25,11 @@ enum class can_id : uint8_t { can0, can1 };
 
 struct CanPortConfig {
     can_id   periph       = can_id::can0;  ///< 外设 ID
-    uint32_t tx_port      = 0;             ///< CAN TX GPIO 端口
-    uint32_t tx_pin       = 0;             ///< CAN TX 引脚掩码
-    uint32_t rx_port      = 0;             ///< CAN RX GPIO 端口
-    uint32_t rx_pin       = 0;             ///< CAN RX 引脚掩码
-    uint32_t af           = GPIO_AF_9;     ///< 复用功能编号（CAN0/1 通常 AF9）
+    port_enum_t tx_port    = port_none;    ///< CAN TX GPIO 端口（portA~portI）
+    pin_enum_t  tx_pin     = pin_none;     ///< CAN TX 引脚（pin0~pin15）
+    port_enum_t rx_port    = port_none;    ///< CAN RX GPIO 端口（portA~portI）
+    pin_enum_t  rx_pin     = pin_none;     ///< CAN RX 引脚（pin0~pin15）
+    af_enum_t   af         = af9;          ///< 复用功能编号（af0~af15，CAN0/1 通常 af9）
     uint32_t baudrate     = 500000;        ///< 波特率: 125000, 250000, 500000, 1000000
     uint32_t mode         = CAN_NORMAL_MODE;  ///< CAN_NORMAL_MODE / CAN_LOOPBACK_MODE / CAN_SILENT_MODE
     uint8_t  filter_bank  = 0;             ///< 过滤器起始 bank（CAN0=0, CAN1=15）
@@ -51,8 +51,8 @@ struct CanPortConfig {
  *
  * 使用示例（CAN0, PB8/PB9, 500kbps）：
  *   static can_port can({
- *       can_id::can0, GPIOB, GPIO_PIN_9, GPIOB, GPIO_PIN_8,
- *       GPIO_AF_9, 500000
+ *       can_id::can0, portB, pin9, portB, pin8,
+ *       af9, 500000
  *   });
  *   can.init();
  *   can.send(0x123, false, data, 8);
