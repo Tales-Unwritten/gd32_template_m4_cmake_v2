@@ -73,9 +73,9 @@ DeviceDS18B20::DeviceDS18B20(io_ctrl &onewire_pin, uint8_t resolution)
 {
     // 总线引脚：开漏输出 + 内部上拉，空闲高电平
     if (_pin.is_initialized())
-        _pin.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_2MHZ);
+        _pin.reinit(mode_output, pullup, otype_od, speed_low);
     else
-        _pin.init(GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_2MHZ);
+        _pin.init(mode_output, pullup, otype_od, speed_low);
     _pin.high();
 
     for (uint8_t i = 0; i < 8; i++)
@@ -252,7 +252,7 @@ uint8_t DeviceDS18B20::getConfig(void)
 void DeviceDS18B20::_busDriveLow(void)
 {
     // 输出开漏 + 拉低（开漏保证总线释放后靠上拉恢复高电平）
-    _pin.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_2MHZ);
+    _pin.reinit(mode_output, pullup, otype_od, speed_low);
     _pin.low();
 }
 
@@ -260,7 +260,7 @@ void DeviceDS18B20::_busDriveLow(void)
 void DeviceDS18B20::_busRelease(void)
 {
     // 输入 + 内部上拉 = 释放总线
-    _pin.reinit(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+    _pin.reinit(mode_input, pullup);
 }
 
 
@@ -274,7 +274,7 @@ bool DeviceDS18B20::_reset(void)
     {
         if (--retries == 0) return false;
         delay_us(2);
-    } while (_pin.read() == RESET);
+    } while (_pin.read() == Low);
 
     // 复位脉冲 480µs
     __disable_irq();
@@ -286,7 +286,7 @@ bool DeviceDS18B20::_reset(void)
     __disable_irq();
     _busRelease();
     delay_us(OW_RESET_DELAY_2);
-    bool r = (_pin.read() == RESET);
+    bool r = (_pin.read() == Low);
     __enable_irq();
 
     // 总线恢复期 410µs
@@ -328,7 +328,7 @@ uint8_t DeviceDS18B20::_readBit(void)
     delay_us(OW_READ_1_DELAY);
     _busRelease();
     delay_us(OW_SAMPLE_DELAY);
-    uint8_t r = (_pin.read() == SET) ? 1 : 0;
+    uint8_t r = (_pin.read() == High) ? 1 : 0;
     __enable_irq();
     delay_us(OW_READ_DELAY);
     return r;

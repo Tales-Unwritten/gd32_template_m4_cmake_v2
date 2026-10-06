@@ -4,7 +4,7 @@
 //  构造 & 初始化
 // ============================================================
 
-device_cat24m01::device_cat24m01(inter_i2c_bus* bus, uint8_t addr)
+device_cat24m01::device_cat24m01(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _addr(addr)
 {

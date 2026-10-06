@@ -51,9 +51,9 @@ public:
         , _lastValue(0)
     {
         if (_data.is_initialized())
-            _data.reinit(GPIO_MODE_INPUT, GPIO_PUPD_NONE);
+            _data.reinit(mode_input, nopull);
         else
-            _data.init(GPIO_MODE_INPUT, GPIO_PUPD_NONE);
+            _data.init(mode_input, nopull);
 
         _init_out(_clock);
         _clock.low();   // 空闲低，上升沿移出数据
@@ -166,7 +166,7 @@ private:
     {
         _clock.high();
         delay_us(1);
-        bool bit = (_data.read() == SET);
+        bool bit = (_data.read() == High);
         _clock.low();
         delay_us(1);
         return bit;
@@ -175,9 +175,9 @@ private:
     static void _init_out(io_ctrl &p)
     {
         if (p.is_initialized())
-            p.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+            p.reinit(mode_output, nopull, otype_pp, speed_low);
         else
-            p.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+            p.init(mode_output, nopull, otype_pp, speed_low);
     }
 
     io_ctrl &_data;

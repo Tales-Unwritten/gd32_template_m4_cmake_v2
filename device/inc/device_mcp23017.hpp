@@ -119,8 +119,8 @@ public:
     //  构造
     // ============================================================
 
-    explicit MCP23017(inter_i2c_bus* bus, uint8_t addr = ADDR_0x20);
-    explicit MCP23017(inter_i2c_bus* bus, uint8_t addr, const Config& cfg);
+    explicit MCP23017(i2c_bus* bus, uint8_t addr = ADDR_0x20);
+    explicit MCP23017(i2c_bus* bus, uint8_t addr, const Config& cfg);
 
     MCP23017(const MCP23017&) = delete;
     MCP23017& operator=(const MCP23017&) = delete;

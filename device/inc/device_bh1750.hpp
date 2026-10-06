@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -17,7 +17,7 @@
 //    基础换算 raw/1.2 = raw×5/6 [lx]，与参考库 getRaw() 一致
 //  - BH1750 无寄存器地址，命令为单字节。inter_i2c_dev 的 freedom_write
 //    会额外发送一个尾随字节：如 powerOff(0x01) 后跟 0x00(=powerOn) 会使
-//    关断失效，故本类命令/读数据直接用 inter_i2c_bus 原语实现
+//    关断失效，故本类命令/读数据直接用 i2c_bus 原语实现
 //    （读数据同参考库：直接 addr+R 读 2 字节，不写任何命令字节）
 //  - HIGH2 模式输出为实际照度 2 倍，需 ÷2（数据手册 P11）
 //  - 灵敏度因子 MT（changeTiming，默认 69）参与照度换算
@@ -77,7 +77,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit BH1750FVI(inter_i2c_bus* bus, uint8_t addr = ADDR_0x23);
+    explicit BH1750FVI(i2c_bus* bus, uint8_t addr = ADDR_0x23);
 
     BH1750FVI(const BH1750FVI&) = delete;
     BH1750FVI& operator=(const BH1750FVI&) = delete;
@@ -154,7 +154,7 @@ public:
 
 private:
 
-    inter_i2c_bus* _bus;    // 命令 / 读数据原语（见文件头说明）
+    i2c_bus* _bus;    // 命令 / 读数据原语（见文件头说明）
     inter_i2c_dev  _dev;    // 仅用于 ping()/isConnected()
     uint8_t        _address;
 

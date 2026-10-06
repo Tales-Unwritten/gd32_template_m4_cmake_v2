@@ -5,7 +5,7 @@
 //  构造
 // ============================================================
 
-SHT4x::SHT4x(inter_i2c_bus* bus, uint8_t addr)
+SHT4x::SHT4x(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _address(addr)
 {

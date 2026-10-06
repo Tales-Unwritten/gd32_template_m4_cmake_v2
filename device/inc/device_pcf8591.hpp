@@ -58,7 +58,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit PCF8591(inter_i2c_bus* bus, uint8_t addr = ADDR_0x48);
+    explicit PCF8591(i2c_bus* bus, uint8_t addr = ADDR_0x48);
 
     PCF8591(const PCF8591&) = delete;
     PCF8591& operator=(const PCF8591&) = delete;

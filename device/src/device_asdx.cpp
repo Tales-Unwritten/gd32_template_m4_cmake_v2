@@ -22,7 +22,7 @@ constexpr int64_t ASDX_SPAN    = 13108;
 //  构造
 // ============================================================
 
-I2C_ASDX::I2C_ASDX(inter_i2c_bus* bus, uint8_t addr, uint8_t psi)
+I2C_ASDX::I2C_ASDX(i2c_bus* bus, uint8_t addr, uint8_t psi)
     : _dev(bus, addr)
     , _bus(bus)
     , _addr(addr)

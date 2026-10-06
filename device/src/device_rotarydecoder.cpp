@@ -110,7 +110,7 @@ bool rotaryDecoder::isKeyPressed()
     }
 
     // 按下 = 低电平（编码器按键常见接法，见头注释）
-    uint8_t level = (_pcf.read(_switchPin) == SET) ? 1u : 0u;
+    uint8_t level = (_pcf.read(_switchPin) != 0u) ? 1u : 0u;
     uint32_t now  = get_tick();
 
     if (level != _keyStable)

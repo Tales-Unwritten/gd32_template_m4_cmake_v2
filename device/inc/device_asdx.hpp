@@ -14,7 +14,7 @@
 // 移植说明：
 //  - ASDX 无命令帧：上电后持续输出，主机直接读 2 字节
 //    （状态 2 位 + 压力 14 位）→ 无寄存器指针的纯读，
-//    inter_i2c_dev 不支持 → 直接操作 inter_i2c_bus
+//    inter_i2c_dev 不支持 → 直接操作 i2c_bus
 //  - 无 FPU：压力 Pa 定点，int64 中间量防溢出
 //  - 量程由构造参数 psi 决定（1/5/15/30/60/100，见数据手册型号表），
 //    psi 非法时量程为 0、读数恒为 0
@@ -56,7 +56,7 @@ public:
      * @param addr I2C 地址
      * @param psi  量程 psi（1/5/15/30/60/100；非法值 → 量程 0）
      */
-    explicit I2C_ASDX(inter_i2c_bus* bus, uint8_t addr = ADDR_0x28,
+    explicit I2C_ASDX(i2c_bus* bus, uint8_t addr = ADDR_0x28,
                       uint8_t psi = 30);
 
     I2C_ASDX(const I2C_ASDX&) = delete;
@@ -109,7 +109,7 @@ public:
 
 private:
     inter_i2c_dev _dev;
-    inter_i2c_bus* _bus;     // 无寄存器指针的纯读需要直接操作总线
+    i2c_bus* _bus;     // 无寄存器指针的纯读需要直接操作总线
     uint8_t _addr;
     uint8_t _err;            // 总线错误标志（0=OK 1=NACK）
 

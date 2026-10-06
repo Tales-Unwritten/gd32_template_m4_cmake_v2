@@ -11,7 +11,7 @@
 //  构造
 // ============================================================
 
-TCA9548::TCA9548(inter_i2c_bus* bus, uint8_t addr)
+TCA9548::TCA9548(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _dev(bus, addr)
     , _mask(0)

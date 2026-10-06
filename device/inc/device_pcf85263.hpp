@@ -142,7 +142,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit device_pcf85263(inter_i2c_bus* bus, uint8_t addr = ADDR_0x51);
+    explicit device_pcf85263(i2c_bus* bus, uint8_t addr = ADDR_0x51);
 
     device_pcf85263(const device_pcf85263&)            = delete;
     device_pcf85263& operator=(const device_pcf85263&) = delete;

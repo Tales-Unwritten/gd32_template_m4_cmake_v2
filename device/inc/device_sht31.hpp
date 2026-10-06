@@ -81,7 +81,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit SHT31(inter_i2c_bus* bus, uint8_t addr = ADDR_0x44);
+    explicit SHT31(i2c_bus* bus, uint8_t addr = ADDR_0x44);
 
     SHT31(const SHT31&) = delete;
     SHT31& operator=(const SHT31&) = delete;

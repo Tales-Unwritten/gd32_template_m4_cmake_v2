@@ -98,7 +98,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit ADS1115(inter_i2c_bus* bus, uint8_t addr = ADDR_0x48);
+    explicit ADS1115(i2c_bus* bus, uint8_t addr = ADDR_0x48);
 
     ADS1115(const ADS1115&) = delete;
     ADS1115& operator=(const ADS1115&) = delete;

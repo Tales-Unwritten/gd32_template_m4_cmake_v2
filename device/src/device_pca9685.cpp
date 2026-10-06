@@ -19,7 +19,7 @@ constexpr uint32_t PRESCALE_NUM = 48828;
 //  构造
 // ============================================================
 
-PCA9685::PCA9685(inter_i2c_bus* bus, uint8_t addr)
+PCA9685::PCA9685(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _addr(addr)
 {
@@ -258,7 +258,7 @@ bool PCA9685::setOutputEnable(bool on)
 uint8_t PCA9685::getOutputEnable()
 {
     if (!_oePin) return 1;   // 未绑定视为常使能
-    return (_oePin->read() == RESET) ? 1 : 0;
+    return (_oePin->read() == Low) ? 1 : 0;
 }
 
 // ============================================================

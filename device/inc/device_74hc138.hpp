@@ -108,16 +108,16 @@ class DEV_74HC138
     {
         if (!_enable)
             return true;                 // 未接使能脚视为常使能
-        return _enable->read() == RESET; // 低 = 使能
+        return _enable->read() == Low; // 低 = 使能
     }
 
   private:
     static void _init_out(io_ctrl &p)
     {
         if (p.is_initialized())
-            p.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+            p.reinit(mode_output, nopull, otype_pp, speed_low);
         else
-            p.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+            p.init(mode_output, nopull, otype_pp, speed_low);
     }
 
     io_ctrl *_pin[3];

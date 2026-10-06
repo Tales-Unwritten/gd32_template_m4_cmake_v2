@@ -61,7 +61,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit AS5600(inter_i2c_bus* bus, uint8_t addr = ADDR_0x36);
+    explicit AS5600(i2c_bus* bus, uint8_t addr = ADDR_0x36);
 
     AS5600(const AS5600&) = delete;
     AS5600& operator=(const AS5600&) = delete;

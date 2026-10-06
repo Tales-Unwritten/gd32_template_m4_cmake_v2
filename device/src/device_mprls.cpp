@@ -29,7 +29,7 @@ TfRange tfRange(I2C_MPRLS::TransferFunction tf)
 //  构造
 // ============================================================
 
-I2C_MPRLS::I2C_MPRLS(inter_i2c_bus* bus, uint8_t addr,
+I2C_MPRLS::I2C_MPRLS(i2c_bus* bus, uint8_t addr,
                      int32_t minPressure_Pa, int32_t maxPressure_Pa)
     : _dev(bus, addr)
     , _bus(bus)

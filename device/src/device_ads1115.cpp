@@ -19,7 +19,7 @@
 //  构造 / 初始化
 // ============================================================
 
-ADS1115::ADS1115(inter_i2c_bus* bus, uint8_t addr)
+ADS1115::ADS1115(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _gain(0)
     , _gainMask(0x0000)          // PGA ±6.144V

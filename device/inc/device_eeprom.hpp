@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include <cstdint>
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include "inter_io_ctrl.hpp"
 
 // ============================================================================
@@ -267,7 +267,7 @@ public:
     //  构造
     // ================================================================
 
-    explicit device_eeprom(inter_i2c_bus &bus, const eeprom_config &cfg);
+    explicit device_eeprom(i2c_bus &bus, const eeprom_config &cfg);
 
     device_eeprom(const device_eeprom &)            = delete;
     device_eeprom &operator=(const device_eeprom &) = delete;
@@ -388,7 +388,7 @@ private:
 
     // ── 数据成员 ────────────────────────────────────────────
 
-    inter_i2c_bus  &_bus;
+    i2c_bus  &_bus;
     eeprom_config   _cfg;
     uint8_t         _i2c_base;      // 基础 7-bit 器件地址（含引脚配置，不含页位）
     uint16_t        _capacity;

@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -16,7 +16,7 @@
 //       PCF8574 P4    → HC4067 使能引脚 E
 //       PCF8574 P5..P7 空闲
 //   - PCF8574 无寄存器概念：写入的任何字节直接输出到端口，
-//     单字节写必须使用 inter_i2c_bus 原语（freedom_write
+//     单字节写必须使用 i2c_bus 原语（freedom_write
 //     最少发 2 字节，第 2 字节会覆盖端口），_dev 仅用于 ping
 //   - 端口类 API（setChannel/enable/disable/isEnabled）
 //     与原版保持一致
@@ -45,7 +45,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit HC4067(inter_i2c_bus* bus, uint8_t addr = ADDR_0x20);
+    explicit HC4067(i2c_bus* bus, uint8_t addr = ADDR_0x20);
 
     HC4067(const HC4067&) = delete;
     HC4067& operator=(const HC4067&) = delete;
@@ -86,7 +86,7 @@ private:
     int _write();
 
     inter_i2c_dev  _dev;
-    inter_i2c_bus *_bus;
+    i2c_bus *_bus;
     uint8_t        _addr;
 
     uint8_t  _channel;    // 当前通道 0..15

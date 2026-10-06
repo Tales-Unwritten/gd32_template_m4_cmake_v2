@@ -42,9 +42,9 @@ public:
         if (_RCO)
         {
             if (_RCO->is_initialized())
-                _RCO->reinit(GPIO_MODE_INPUT, GPIO_PUPD_NONE);
+                _RCO->reinit(mode_input, nopull);
             else
-                _RCO->init(GPIO_MODE_INPUT, GPIO_PUPD_NONE);
+                _RCO->init(mode_input, nopull);
         }
 
         _OE.low();      // 默认使能输出
@@ -91,7 +91,7 @@ public:
     uint8_t readRCO()
     {
         if (_RCO == nullptr) return 0;
-        return (_RCO->read() == SET) ? 1 : 0;
+        return (_RCO->read() == High) ? 1 : 0;
     }
 
 protected:
@@ -99,9 +99,9 @@ protected:
     static void _init_out(io_ctrl &p)
     {
         if (p.is_initialized())
-            p.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+            p.reinit(mode_output, nopull, otype_pp, speed_low);
         else
-            p.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+            p.init(mode_output, nopull, otype_pp, speed_low);
     }
 
     io_ctrl &_OE;

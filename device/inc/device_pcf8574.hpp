@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -17,7 +17,7 @@
 //    - PCF8574 没有寄存器地址空间：写 = 直接发 1 字节输出值，
 //      读 = 直接收 1 字节端口状态。inter_i2c_dev 的 freedom_* 接口
 //      总是先发寄存器字节，无法表达该协议（会把寄存器字节当作输出
-//      数据写进端口），因此 read8/write8 直接使用 inter_i2c_bus
+//      数据写进端口），因此 read8/write8 直接使用 i2c_bus
 //      原语（与 inter_i2c_dev.cpp 相同的时序），ping/isConnected
 //      仍走 _dev
 //    - 准双向口：输出 1 时引脚呈高阻（可被外部拉低），读引脚前
@@ -68,8 +68,8 @@ public:
     //  构造
     // ============================================================
 
-    explicit PCF8574(inter_i2c_bus* bus, uint8_t addr = ADDR_0x20);
-    explicit PCF8574(inter_i2c_bus* bus, uint8_t addr, const Config& cfg);
+    explicit PCF8574(i2c_bus* bus, uint8_t addr = ADDR_0x20);
+    explicit PCF8574(i2c_bus* bus, uint8_t addr, const Config& cfg);
 
     PCF8574(const PCF8574&) = delete;
     PCF8574& operator=(const PCF8574&) = delete;
@@ -110,7 +110,7 @@ public:
 
 private:
 
-    inter_i2c_bus *_bus;      // 裸字节传输用（见移植说明）
+    i2c_bus *_bus;      // 裸字节传输用（见移植说明）
     inter_i2c_dev  _dev;
     uint8_t        _addr;
     uint8_t        _dataIn;   // 最近一次读入值

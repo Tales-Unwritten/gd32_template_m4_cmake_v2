@@ -8,7 +8,7 @@
 //  构造
 // ============================================================
 
-INA228::INA228(inter_i2c_bus* bus, uint8_t addr)
+INA228::INA228(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _alertPin(nullptr)
     , _currentLSB_nA(0)
@@ -16,7 +16,7 @@ INA228::INA228(inter_i2c_bus* bus, uint8_t addr)
     _updateCurrentLSB();
 }
 
-INA228::INA228(inter_i2c_bus* bus, uint8_t addr, const Config& cfg)
+INA228::INA228(i2c_bus* bus, uint8_t addr, const Config& cfg)
     : _dev(bus, addr)
     , _cfg(cfg)
     , _alertPin(nullptr)
@@ -124,10 +124,10 @@ void INA228::init()
 
     // 6. 自动配置报警引脚（Config 中指定了 GPIO 端口和引脚时）
     //    零堆分配：io_ctrl 为成员对象（非指针），移动赋值接管引脚所有权
-    if (_cfg.alert_port != 0 && _cfg.alert_pin != 0)
+    if (_cfg.alert_port != port_none && _cfg.alert_pin != pin_none)
     {
         _alertPinAuto = io_ctrl(_cfg.alert_port, _cfg.alert_pin);  // 释放旧引脚 + 接管新引脚
-        _alertPinAuto.init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);     // 时钟使能 + 上拉输入
+        _alertPinAuto.init(mode_input, pullup);                    // 时钟使能 + 上拉输入
     }
 }
 
@@ -403,11 +403,11 @@ bool INA228::isAlertAsserted()
 {
     // 优先使用 bindAlertPin 绑定的外部引脚
     if (_alertPin)
-        return _alertPin->read() == RESET;
+        return _alertPin->read() == Low;
 
     // 否则使用 Config 自动配置的引脚（io_ctrl 成员，未配置时无效）
     if (_alertPinAuto.is_initialized())
-        return _alertPinAuto.read() == RESET;
+        return _alertPinAuto.read() == Low;
 
     return false;
 }

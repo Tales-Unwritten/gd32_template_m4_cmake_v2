@@ -15,7 +15,7 @@
 //  构造 / 初始化
 // ============================================================
 
-HC4067::HC4067(inter_i2c_bus* bus, uint8_t addr)
+HC4067::HC4067(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _bus(bus)
     , _addr(addr)

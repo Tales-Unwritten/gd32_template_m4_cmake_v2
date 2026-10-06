@@ -33,7 +33,7 @@ DS2401::DS2401(io_ctrl& pin)
 void DS2401::init()
 {
     // 开漏输出 + 内部上拉：high() = 释放总线（读引脚），low() = 拉低
-    _pin.init(GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO_OTYPE_OD, GPIO_OSPEED_25MHZ);
+    _pin.init(mode_output, pullup, otype_od, speed_medium);
     _pin.high();
 }
 
@@ -103,7 +103,7 @@ bool DS2401::_reset()
     _pin.high();                              // 释放（开漏 → 上拉）
 
     delay_us(RESET_SAMPLE_US);                // 从机 15~60µs 后拉低，持续 60~240µs
-    bool presence = (_pin.read() == RESET);   // 采样点仍在从机低电平窗口内
+    bool presence = (_pin.read() == Low);     // 采样点仍在从机低电平窗口内
 
     delay_us(RESET_TOTAL_US - RESET_SAMPLE_US);  // 补满复位周期再操作
     return presence;
@@ -136,7 +136,7 @@ bool DS2401::_readBit()
     _pin.high();                              // 释放，等待从机驱动
 
     delay_us(READ_SAMPLE_US);                 // 采样点须在 tRDV = 15µs 内
-    bit = (_pin.read() == SET);               // 从机拉低 = 逻辑 0
+    bit = (_pin.read() == High);              // 从机拉低 = 逻辑 0
 
     delay_us(SLOT_US - READ_LOW_US - READ_SAMPLE_US + RECOVERY_US);
     return bit;

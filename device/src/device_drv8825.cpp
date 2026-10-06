@@ -66,7 +66,7 @@ bool DRV8825::setDirection(uint8_t direction)
 
 uint8_t DRV8825::getDirection()
 {
-    return (_dir.read() == SET) ? COUNTERCLOCK_WISE : CLOCK_WISE;
+    return (_dir.read() == High) ? COUNTERCLOCK_WISE : CLOCK_WISE;
 }
 
 // ============================================================
@@ -170,7 +170,7 @@ bool DRV8825::disable()
 
 bool DRV8825::isEnabled()
 {
-    return (_en.read() == RESET);    // 低有效
+    return (_en.read() == Low);    // 低有效
 }
 
 bool DRV8825::reset()
@@ -207,7 +207,7 @@ bool DRV8825::wakeup()
 
 bool DRV8825::isSleeping()
 {
-    return (_slp != nullptr) && (_slp->read() == RESET);
+    return (_slp != nullptr) && (_slp->read() == Low);
 }
 
 // ============================================================

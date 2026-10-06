@@ -259,13 +259,13 @@ int8_t DeviceDHTNEW::_readSensor()
         // 高电平宽度决定 0/1：26~28µs = 0，70µs = 1
         // 轮询计数 ≈ µs（每轮 delay_us(1)）
         uint32_t t = 0;
-        while (_pin.read() == SET)
+        while (_pin.read() == High)
         {
             t++;
             if (t > TIMEOUT_BIT) break;
             delay_us(1);
         }
-        if (_pin.read() == SET)
+        if (_pin.read() == High)
         {
             if (_disableIRQ) __enable_irq();
             return DHTLIB_ERROR_TIMEOUT_D;
@@ -303,7 +303,7 @@ bool DeviceDHTNEW::_waitFor(uint8_t state, uint32_t timeout)
     uint32_t count = 2;
     for (uint32_t i = 0; i < timeout; i++)
     {
-        if ((_pin.read() == SET) == (state != 0))
+        if ((_pin.read() == High) == (state != 0))
         {
             count--;
             if (count == 0) return false;
@@ -341,18 +341,18 @@ void DeviceDHTNEW::powerDown()
 void DeviceDHTNEW::_pinOut()
 {
     if (_pin.is_initialized())
-        _pin.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+        _pin.reinit(mode_output, nopull, otype_pp, speed_low);
     else
-        _pin.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+        _pin.init(mode_output, nopull, otype_pp, speed_low);
 }
 
 
 void DeviceDHTNEW::_pinIn()
 {
     if (_pin.is_initialized())
-        _pin.reinit(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+        _pin.reinit(mode_input, pullup);
     else
-        _pin.init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+        _pin.init(mode_input, pullup);
 }
 
 

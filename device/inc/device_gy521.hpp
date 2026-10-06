@@ -65,7 +65,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit GY521(inter_i2c_bus* bus, uint8_t addr = ADDR_0x68);
+    explicit GY521(i2c_bus* bus, uint8_t addr = ADDR_0x68);
 
     GY521(const GY521&) = delete;
     GY521& operator=(const GY521&) = delete;

@@ -20,7 +20,7 @@ const device_eeprom::_model_info device_eeprom::_model_table[] = {
 //  构造 & 初始化
 // ============================================================================
 
-device_eeprom::device_eeprom(inter_i2c_bus &bus, const eeprom_config &cfg)
+device_eeprom::device_eeprom(i2c_bus &bus, const eeprom_config &cfg)
     : _bus(bus)
     , _cfg(cfg)
     , _i2c_base(0)
@@ -59,7 +59,7 @@ void device_eeprom::init()
     // 初始化 WP 引脚（开漏输出，默认高电平 = 写保护）
     if (_cfg.wp_pin && !_cfg.wp_pin->is_initialized())
     {
-        _cfg.wp_pin->init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+        _cfg.wp_pin->init(mode_output, nopull, otype_pp, speed_low);
         _cfg.wp_pin->high();  // 默认写保护
     }
 

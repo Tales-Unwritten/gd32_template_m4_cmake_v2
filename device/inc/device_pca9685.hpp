@@ -90,7 +90,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit PCA9685(inter_i2c_bus* bus, uint8_t addr = ADDR_0x40);
+    explicit PCA9685(i2c_bus* bus, uint8_t addr = ADDR_0x40);
 
     PCA9685(const PCA9685&) = delete;
     PCA9685& operator=(const PCA9685&) = delete;

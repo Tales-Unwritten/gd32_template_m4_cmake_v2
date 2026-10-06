@@ -139,9 +139,9 @@ public:
         Alatch        alatch        = Alatch::Latch;        // 锁存使能
         Apol          apol          = Apol::ActiveLow;      // 开漏低有效
 
-        // ── 报警引脚自动配置（0=不使用） ──
-        uint32_t      alert_port    = 0;               // GPIO 端口，如 GPIOB
-        uint32_t      alert_pin     = 0;               // 引脚掩码，如 GPIO_PIN_5
+        // ── 报警引脚自动配置（port_none/pin_none=不使用） ──
+        port_enum_t   alert_port    = port_none;       // GPIO 端口，如 portB
+        pin_enum_t    alert_pin     = pin_none;        // 引脚，如 pin5
 
         // ── 报警 ──
         uint16_t      alertLimit    = 0x0000;   // Alert Limit 寄存器值
@@ -166,8 +166,8 @@ public:
     //  构造
     // ============================================================
 
-    explicit INA260(inter_i2c_bus* bus, uint8_t addr = ADDR_0x40);
-    explicit INA260(inter_i2c_bus* bus, uint8_t addr, const Config& cfg);
+    explicit INA260(i2c_bus* bus, uint8_t addr = ADDR_0x40);
+    explicit INA260(i2c_bus* bus, uint8_t addr, const Config& cfg);
 
     INA260(const INA260&) = delete;
     INA260& operator=(const INA260&) = delete;
@@ -281,7 +281,7 @@ private:
     inter_i2c_dev _dev;
     Config         _cfg;
     io_ctrl       *_alertPin    = nullptr;   // 外部报警引脚（bindAlertPin 绑定）
-    io_ctrl        _alertPinAuto{0, 0};      // 自动配置的报警引脚（Config::alert_port/alert_pin，零堆分配）
+    io_ctrl        _alertPinAuto{port_none, pin_none};  // 自动配置的报警引脚（Config::alert_port/alert_pin，零堆分配）
 
     int32_t _maxCurrent_mA = 15000;    // 应用层最大电流记录（仅参考）
 

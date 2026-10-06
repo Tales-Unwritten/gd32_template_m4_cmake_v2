@@ -4,7 +4,7 @@
 //  构造 & 初始化
 // ============================================================
 
-device_pcf85263::device_pcf85263(inter_i2c_bus* bus, uint8_t addr)
+device_pcf85263::device_pcf85263(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _addr(addr)
 {

@@ -14,7 +14,7 @@
 //  构造 / 复位
 // ============================================================
 
-MHZCO2::MHZCO2(usart_port& uart)
+MHZCO2::MHZCO2(usart_port_base& uart)
     : _uart(uart)
     , _timeout(1000)
     , _range(0)

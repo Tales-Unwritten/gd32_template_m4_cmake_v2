@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -21,13 +21,13 @@
 //      · FRAM_RINGBUFFER 环形缓冲子模块（与驱动无关的应用层）
 //  - FRAM 无写周期延迟、无页限制、写入寿命无限（参考库特性），
 //    可任意长度连续写；块操作按 64 字节分块，避免单次事务
-//    长时间占用总线（inter_i2c_bus::lock 期间关中断）
+//    长时间占用总线（i2c_bus::lock 期间关中断）
 //  - update_byte 写前比较（读-比-写），内容相同则不写
 //  - 器件 ID（厂商/密度/产品）：从机地址 0x7C 读 3 字节
 //  - sleep/wakeup：0x7C/0x86 专用命令序列（见数据手册 P12）
 //  - inter_i2c_dev 的 freedom_read/write 无法表达 16 位内存地址
 //    与 >8 字节块传输，故与 device_eeprom 一致，直接使用
-//    inter_i2c_bus 原语
+//    i2c_bus 原语
 // ============================================================
 
 class device_fram
@@ -68,7 +68,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit device_fram(inter_i2c_bus* bus, uint8_t addr = ADDR_0x50);
+    explicit device_fram(i2c_bus* bus, uint8_t addr = ADDR_0x50);
 
     device_fram(const device_fram&)            = delete;
     device_fram& operator=(const device_fram&) = delete;
@@ -146,7 +146,7 @@ private:
     static constexpr uint8_t FRAM_SLAVE_ID  = 0x7C;   // 器件 ID 从机（7 位）
     static constexpr uint8_t FRAM_SLEEP_CMD = 0x86;   // 睡眠命令字节
 
-    inter_i2c_bus* _bus;
+    i2c_bus* _bus;
     uint8_t        _address;
     uint32_t       _size_bytes = 0;
     int            _error = ERR_OK;

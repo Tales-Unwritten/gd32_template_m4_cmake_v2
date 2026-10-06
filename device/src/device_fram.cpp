@@ -5,7 +5,7 @@
 //  构造 & 初始化
 // ============================================================
 
-device_fram::device_fram(inter_i2c_bus* bus, uint8_t addr)
+device_fram::device_fram(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _address(addr)
 {

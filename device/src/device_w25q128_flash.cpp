@@ -11,12 +11,12 @@
 w25q128_flash::w25q128_flash()
     : _spi(SpiPortConfig{
           spi_id::spi1,
-          (uint32_t)GPIOA, GPIO_PIN_5,   // SCK
-          (uint32_t)GPIOA, GPIO_PIN_7,   // MOSI
-          (uint32_t)GPIOA, GPIO_PIN_6,   // MISO
-          (uint32_t)GPIOA, GPIO_PIN_4,   // CS
-          RESET,                          // CS 低有效
-          GPIO_AF_5,
+          portA, pin5,   // SCK
+          portA, pin7,   // MOSI
+          portA, pin6,   // MISO
+          portA, pin4,   // CS
+          Low,                            // CS 低有效
+          af5,
           SPI_PSC_2,
           SPI_CK_PL_HIGH_PH_2EDGE,        // Mode 3
           SPI_ENDIAN_MSB,

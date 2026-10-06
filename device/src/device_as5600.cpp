@@ -34,7 +34,7 @@ constexpr uint8_t CONF_WATCH_DOG     = 0x20;   // 低字节 [5]
 //  构造
 // ============================================================
 
-AS5600::AS5600(inter_i2c_bus* bus, uint8_t addr)
+AS5600::AS5600(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _addr(addr)
 {

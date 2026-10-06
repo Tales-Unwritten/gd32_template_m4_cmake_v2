@@ -11,13 +11,13 @@
 //  构造
 // ============================================================
 
-MCP23017::MCP23017(inter_i2c_bus* bus, uint8_t addr)
+MCP23017::MCP23017(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _error(ERR_NONE)
 {
 }
 
-MCP23017::MCP23017(inter_i2c_bus* bus, uint8_t addr, const Config& cfg)
+MCP23017::MCP23017(i2c_bus* bus, uint8_t addr, const Config& cfg)
     : _dev(bus, addr)
     , _cfg(cfg)
     , _error(ERR_NONE)

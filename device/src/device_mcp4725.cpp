@@ -16,7 +16,7 @@
 //  构造 / 初始化
 // ============================================================
 
-MCP4725::MCP4725(inter_i2c_bus* bus, uint8_t addr)
+MCP4725::MCP4725(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _bus(bus)
     , _addr(addr)

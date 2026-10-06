@@ -145,7 +145,7 @@ void MCP4921::setLatchPin(io_ctrl *pin)
     _latchPin = pin;
     if (_latchPin != nullptr)
     {
-        _latchPin->init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_25MHZ);
+        _latchPin->init(mode_output, nopull, otype_pp, speed_medium);
         _latchPin->high();   // LDAC 空闲高电平
     }
 }

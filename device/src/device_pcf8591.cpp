@@ -15,7 +15,7 @@
 //  构造 / 初始化
 // ============================================================
 
-PCF8591::PCF8591(inter_i2c_bus* bus, uint8_t addr)
+PCF8591::PCF8591(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _addr(addr)
     , _control(0)

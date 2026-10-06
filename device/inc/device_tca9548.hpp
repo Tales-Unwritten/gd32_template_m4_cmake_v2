@@ -57,7 +57,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit TCA9548(inter_i2c_bus* bus, uint8_t addr = ADDR_0x70);
+    explicit TCA9548(i2c_bus* bus, uint8_t addr = ADDR_0x70);
 
     TCA9548(const TCA9548&) = delete;
     TCA9548& operator=(const TCA9548&) = delete;
@@ -108,7 +108,7 @@ public:
 
 private:
 
-    inter_i2c_bus *_bus;     // 探测任意地址用
+    i2c_bus *_bus;     // 探测任意地址用
     inter_i2c_dev  _dev;
     uint8_t        _mask;    // 缓存当前通道掩码
     uint8_t        _err;     // 0 = 无错误

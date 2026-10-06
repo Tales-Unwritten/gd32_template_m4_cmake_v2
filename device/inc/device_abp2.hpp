@@ -16,7 +16,7 @@
 //  - 命令帧 0xAA 0x00 0x00 用 inter_i2c_dev::freedom_write(0xAA, 0, 2)
 //    实现（寄存器字节即命令首字节）
 //  - 读 7 字节（状态 1 + 压力 24 位 + 温度 24 位）是"无寄存器指针"
-//    的纯读操作，inter_i2c_dev 不支持 → 直接操作 inter_i2c_bus
+//    的纯读操作，inter_i2c_dev 不支持 → 直接操作 i2c_bus
 //  - 无 FPU：压力 Pa、温度 m°C 定点，int64 中间量防溢出
 //  - 输出类型固定按 10%..90% of 2^24 处理（原库同；型号不同时
 //    需按数据手册调整 minCnt/maxCnt 常量）
@@ -57,7 +57,7 @@ public:
      * @param minPressure_Pa 量程下限 Pa（仅换算用，不写入芯片）
      * @param maxPressure_Pa 量程上限 Pa
      */
-    explicit I2C_ABP2(inter_i2c_bus* bus, uint8_t addr = ADDR_0x28,
+    explicit I2C_ABP2(i2c_bus* bus, uint8_t addr = ADDR_0x28,
                       int32_t minPressure_Pa = 0,
                       int32_t maxPressure_Pa = 100000);
 
@@ -114,7 +114,7 @@ public:
 
 private:
     inter_i2c_dev _dev;
-    inter_i2c_bus* _bus;     // 无寄存器指针的纯读需要直接操作总线
+    i2c_bus* _bus;     // 无寄存器指针的纯读需要直接操作总线
     uint8_t _addr;
     uint8_t _err;            // 总线错误标志（0=OK 1=NACK，镜像 lastError 语义）
 

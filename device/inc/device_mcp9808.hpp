@@ -105,7 +105,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit MCP9808(inter_i2c_bus* bus, uint8_t addr = ADDR_0x18);
+    explicit MCP9808(i2c_bus* bus, uint8_t addr = ADDR_0x18);
 
     MCP9808(const MCP9808&) = delete;
     MCP9808& operator=(const MCP9808&) = delete;

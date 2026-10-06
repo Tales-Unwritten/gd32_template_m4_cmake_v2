@@ -20,7 +20,7 @@ constexpr int64_t TEMP_RAW_MAX = 16777215;
 //  构造
 // ============================================================
 
-I2C_ABP2::I2C_ABP2(inter_i2c_bus* bus, uint8_t addr,
+I2C_ABP2::I2C_ABP2(i2c_bus* bus, uint8_t addr,
                    int32_t minPressure_Pa, int32_t maxPressure_Pa)
     : _dev(bus, addr)
     , _bus(bus)

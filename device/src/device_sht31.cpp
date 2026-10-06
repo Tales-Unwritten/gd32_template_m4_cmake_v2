@@ -11,7 +11,7 @@ static constexpr uint32_t SHT31_HEATER_COOLDOWN_MS = 180000UL;
 //  构造
 // ============================================================
 
-SHT31::SHT31(inter_i2c_bus* bus, uint8_t addr)
+SHT31::SHT31(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
     , _address(addr)
 {

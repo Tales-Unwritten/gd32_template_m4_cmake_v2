@@ -35,7 +35,7 @@ int32_t rawToTemp_mC(int32_t raw)
 //  构造
 // ============================================================
 
-GY521::GY521(inter_i2c_bus* bus, uint8_t addr)
+GY521::GY521(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
 {
 }

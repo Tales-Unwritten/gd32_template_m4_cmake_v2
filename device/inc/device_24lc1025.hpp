@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -24,7 +24,7 @@
 //  - 页大小 128 字节；页写自动分页；写周期用 ACK 轮询等待
 //  - inter_i2c_dev 的 freedom_read/write 只能表达单字节寄存器
 //    地址且 ≤8 字节，无法承载 16 位内存地址与 >8 字节块传输，
-//    故与 device_eeprom 一致，直接使用 inter_i2c_bus 原语
+//    故与 device_eeprom 一致，直接使用 i2c_bus 原语
 // ============================================================
 
 class device_24lc1025
@@ -60,7 +60,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit device_24lc1025(inter_i2c_bus* bus, uint8_t addr = ADDR_0x50);
+    explicit device_24lc1025(i2c_bus* bus, uint8_t addr = ADDR_0x50);
 
     device_24lc1025(const device_24lc1025&)            = delete;
     device_24lc1025& operator=(const device_24lc1025&) = delete;
@@ -117,7 +117,7 @@ public:
     uint8_t get_write_timeout_ms() const { return _write_timeout_ms; }
 
 private:
-    inter_i2c_bus* _bus;
+    i2c_bus* _bus;
     uint8_t        _addr;
     uint8_t        _write_timeout_ms = 10;
     int            _error = ERR_OK;

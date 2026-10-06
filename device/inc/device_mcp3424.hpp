@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -14,7 +14,7 @@
 //     派生型号可用 getMaxChannels() 约束通道数模拟
 //   - MCP3424 无寄存器地址概念：I2C 写入的任何字节都被当作
 //     配置字节，读取则是「纯读」3/4 字节（最后 1 字节 = 状态）。
-//     因此配置写与数据读均直接使用 inter_i2c_bus 原语
+//     因此配置写与数据读均直接使用 i2c_bus 原语
 //     （项目 device_eeprom 同款做法），_dev 仅用于 ping
 //   - 禁止 float：readVolts/MilliVolts/MicroVolts 改为定点
 //     uV/mV 返回（LSB = 15.625µV × 2^(18-bits)，见 cpp 推导）
@@ -62,7 +62,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit MCP3424(inter_i2c_bus* bus, uint8_t addr = ADDR_0x68);
+    explicit MCP3424(i2c_bus* bus, uint8_t addr = ADDR_0x68);
 
     MCP3424(const MCP3424&) = delete;
     MCP3424& operator=(const MCP3424&) = delete;
@@ -141,7 +141,7 @@ private:
     // ── 成员 ───────────────────────────────────────────────
 
     inter_i2c_dev  _dev;
-    inter_i2c_bus *_bus;
+    i2c_bus *_bus;
     uint8_t        _addr;
 
     uint8_t  _channel;   // 0..3

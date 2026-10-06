@@ -41,7 +41,7 @@ constexpr uint8_t PCF_D7 = 0x80;   // P7
 //  构造
 // ============================================================
 
-I2C_LCD::I2C_LCD(inter_i2c_bus* bus, uint8_t addr, uint8_t cols, uint8_t rows)
+I2C_LCD::I2C_LCD(i2c_bus* bus, uint8_t addr, uint8_t cols, uint8_t rows)
     : _dev(bus, addr)
     , _bus(bus)
     , _addr(addr)

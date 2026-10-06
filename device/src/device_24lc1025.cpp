@@ -4,7 +4,7 @@
 //  构造 & 初始化
 // ============================================================
 
-device_24lc1025::device_24lc1025(inter_i2c_bus* bus, uint8_t addr)
+device_24lc1025::device_24lc1025(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _addr(addr)
 {

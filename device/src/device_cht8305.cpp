@@ -5,7 +5,7 @@
 //  构造
 // ============================================================
 
-CHT8305::CHT8305(inter_i2c_bus* bus, uint8_t addr)
+CHT8305::CHT8305(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _dev(bus, addr)
     , _addr(addr)
@@ -58,7 +58,7 @@ int CHT8305::getLastError()
 //  CHT8305 读温度寄存器会触发一次新转换（约 13 ms @14bit），
 //  参考库流程: 写寄存器地址 → 延时(_conversionDelay) → 读数据。
 //  inter_i2c_dev 的组合事务（写寄存器 + 立即读）无法在中间插入延时，
-//  因此用 inter_i2c_bus 原语只写寄存器地址（无数据）触发转换。
+//  因此用 i2c_bus 原语只写寄存器地址（无数据）触发转换。
 //  延时后仍走 _dev.freedom_read() 读回：freedom_read 会再写一次寄存器
 //  地址，此时转换已完成——即使该写操作重新触发一次转换，读到的也是
 //  上一次已完成的结果（参考库 requestFrom 同样不依赖寄存器指针内容）。

@@ -4,7 +4,7 @@
 //  构造
 // ============================================================
 
-MCP9808::MCP9808(inter_i2c_bus* bus, uint8_t addr)
+MCP9808::MCP9808(i2c_bus* bus, uint8_t addr)
     : _dev(bus, addr)
 {
 }

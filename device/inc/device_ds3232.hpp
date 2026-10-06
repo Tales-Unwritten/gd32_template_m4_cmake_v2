@@ -161,7 +161,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit device_ds3232(inter_i2c_bus* bus, uint8_t addr = ADDR_0x68);
+    explicit device_ds3232(i2c_bus* bus, uint8_t addr = ADDR_0x68);
 
     device_ds3232(const device_ds3232&)            = delete;
     device_ds3232& operator=(const device_ds3232&) = delete;

@@ -49,7 +49,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit I2C_LCD(inter_i2c_bus* bus, uint8_t addr = ADDR_0x27,
+    explicit I2C_LCD(i2c_bus* bus, uint8_t addr = ADDR_0x27,
                      uint8_t cols = 16, uint8_t rows = 2);
 
     I2C_LCD(const I2C_LCD&) = delete;
@@ -120,7 +120,7 @@ private:
     void _write4bits(uint8_t value);
 
     inter_i2c_dev _dev;          // 探测用（isConnected / lastError）
-    inter_i2c_bus* _bus;         // 裸字节写需直接操作总线（PCF8574 无寄存器）
+    i2c_bus* _bus;         // 裸字节写需直接操作总线（PCF8574 无寄存器）
     uint8_t _addr;
 
     uint8_t _cols;               // 列数（默认 16）

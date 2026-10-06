@@ -11,7 +11,7 @@
 //  构造
 // ============================================================
 
-PCF8574::PCF8574(inter_i2c_bus* bus, uint8_t addr)
+PCF8574::PCF8574(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _dev(bus, addr)
     , _addr(addr)
@@ -21,7 +21,7 @@ PCF8574::PCF8574(inter_i2c_bus* bus, uint8_t addr)
 {
 }
 
-PCF8574::PCF8574(inter_i2c_bus* bus, uint8_t addr, const Config& cfg)
+PCF8574::PCF8574(i2c_bus* bus, uint8_t addr, const Config& cfg)
     : _bus(bus)
     , _dev(bus, addr)
     , _addr(addr)

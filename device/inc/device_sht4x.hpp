@@ -82,7 +82,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit SHT4x(inter_i2c_bus* bus, uint8_t addr = ADDR_0x44);
+    explicit SHT4x(i2c_bus* bus, uint8_t addr = ADDR_0x44);
 
     SHT4x(const SHT4x&) = delete;
     SHT4x& operator=(const SHT4x&) = delete;

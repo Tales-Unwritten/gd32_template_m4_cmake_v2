@@ -5,7 +5,7 @@
 //  构造
 // ============================================================
 
-BH1750FVI::BH1750FVI(inter_i2c_bus* bus, uint8_t addr)
+BH1750FVI::BH1750FVI(i2c_bus* bus, uint8_t addr)
     : _bus(bus)
     , _dev(bus, addr)
     , _address(addr)
@@ -51,7 +51,7 @@ int BH1750FVI::getLastError()
 //  BH1750 命令为单字节且无寄存器指针。若用 freedom_write(cmd, 0x00, 1)，
 //  尾随的 0x00 会被芯片当作 powerOn 命令，使 powerOff()/reset() 失效；
 //  读数同理（参考库 requestFrom 不写任何字节）。
-//  因此命令与读数直接用 inter_i2c_bus 原语实现，与参考库 Wire 流程一致。
+//  因此命令与读数直接用 i2c_bus 原语实现，与参考库 Wire 流程一致。
 // ============================================================
 
 bool BH1750FVI::command(uint8_t value)

@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -15,7 +15,7 @@
 //   - 写事务（2/3 字节）用 _dev.freedom_write()（reg 作首字节）
 //   - 读事务必须先「只发地址不发数据」再读，freedom_read 会
 //     先发 reg 字节（= 改写 DAC 值），因此读必须直接使用
-//     inter_i2c_bus 原语（项目 device_eeprom 同款做法）
+//     i2c_bus 原语（项目 device_eeprom 同款做法）
 //   - 禁止 float：setPercentage 用 0.01% 定点、电压用 mV 定点
 //   - EEPROM 写周期等待：ready() 轮询状态字节 bit7，
 //     内部等待带超时（delay.hpp），不依赖 millis()
@@ -73,7 +73,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit MCP4725(inter_i2c_bus* bus, uint8_t addr = ADDR_0x60);
+    explicit MCP4725(i2c_bus* bus, uint8_t addr = ADDR_0x60);
 
     MCP4725(const MCP4725&) = delete;
     MCP4725& operator=(const MCP4725&) = delete;
@@ -162,7 +162,7 @@ private:
     // ── 成员 ──────────────────────────────────────────────
 
     inter_i2c_dev  _dev;
-    inter_i2c_bus *_bus;
+    i2c_bus *_bus;
     uint8_t        _addr;
 
     uint16_t _lastValue;        // 缓存最近成功写入值

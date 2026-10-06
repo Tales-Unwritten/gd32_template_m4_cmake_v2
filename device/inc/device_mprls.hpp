@@ -18,7 +18,7 @@
 //  - 测量命令 0xAA 0x00 0x00（数据手册 6.6.1；任务描述中的 0xF0 未见于
 //    数据手册与参考库，本驱动以数据手册为准）
 //  - 状态/数据读（1 字节 / 4 字节）为"无寄存器指针"的纯读操作，
-//    inter_i2c_dev 不支持 → 直接操作 inter_i2c_bus
+//    inter_i2c_dev 不支持 → 直接操作 i2c_bus
 //  - 无 FPU：压力 Pa 定点，int64 中间量防溢出
 //  - 传输函数 A/B/C 的 24 位计数边界采用原库常量：
 //      A 10%..90%  → 1677722..15099494（span 13421772）
@@ -78,7 +78,7 @@ public:
      * @param minPressure_Pa 量程下限 Pa（仅换算用，不写入芯片）
      * @param maxPressure_Pa 量程上限 Pa
      */
-    explicit I2C_MPRLS(inter_i2c_bus* bus, uint8_t addr = ADDR_0x18,
+    explicit I2C_MPRLS(i2c_bus* bus, uint8_t addr = ADDR_0x18,
                        int32_t minPressure_Pa = 0,
                        int32_t maxPressure_Pa = 25000);
 
@@ -155,7 +155,7 @@ private:
     bool _readRaw(uint8_t len, uint64_t* out);
 
     inter_i2c_dev _dev;
-    inter_i2c_bus* _bus;
+    i2c_bus* _bus;
     uint8_t _addr;
     uint8_t _err;            // 总线错误标志（0=OK 1=NACK）
 

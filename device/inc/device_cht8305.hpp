@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 
 #include "inter_i2c_dev.hpp"
-#include "inter_i2c_bus.hpp"
+#include "inter_i2c.hpp"
 #include <cstdint>
 
 // ============================================================
@@ -18,7 +18,7 @@
 //    参考库限制 1 秒内只能调一次 read 系函数（本移植保留）
 //  - 转换触发 = "写寄存器地址（无数据）→ 延时 → 读数据"两阶段事务，
 //    inter_i2c_dev 的组合事务（写寄存器 + 立即读）无法插入延时，
-//    故触发写用 inter_i2c_bus 原语实现（见 _triggerConversion 注释）
+//    故触发写用 i2c_bus 原语实现（见 _triggerConversion 注释）
 //  - ⚠ 电阻测量：参考库 v0.2.4 未提供独立的电阻测量 API。
 //    寄存器 0x04 在 README 中标注为 VOLTAGE，公式 V = raw×5V/32768
 //    为 best guess（参考库原注释 "meaning of this function is unclear"），
@@ -102,7 +102,7 @@ public:
     //  构造
     // ============================================================
 
-    explicit CHT8305(inter_i2c_bus* bus, uint8_t addr = ADDR_0x40);
+    explicit CHT8305(i2c_bus* bus, uint8_t addr = ADDR_0x40);
 
     CHT8305(const CHT8305&) = delete;
     CHT8305& operator=(const CHT8305&) = delete;
@@ -209,7 +209,7 @@ public:
 
 private:
 
-    inter_i2c_bus* _bus;    // 转换触发原语用（见文件头说明）
+    i2c_bus* _bus;    // 转换触发原语用（见文件头说明）
     inter_i2c_dev  _dev;
     uint8_t        _addr;
 

@@ -34,15 +34,15 @@ DeviceHX711::DeviceHX711(io_ctrl &dataPin, io_ctrl &clockPin)
 {
     // DOUT：输入 + 上拉（参考库 INPUT_PULLUP）
     if (_data.is_initialized())
-        _data.reinit(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+        _data.reinit(mode_input, pullup);
     else
-        _data.init(GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+        _data.init(mode_input, pullup);
 
     // PD_SCK：推挽输出，空闲低电平（参考库 digitalWrite LOW）
     if (_clock.is_initialized())
-        _clock.reinit(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+        _clock.reinit(mode_output, nopull, otype_pp, speed_low);
     else
-        _clock.init(GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ);
+        _clock.init(mode_output, nopull, otype_pp, speed_low);
     _clock.low();
 }
 
@@ -72,7 +72,7 @@ void DeviceHX711::reset()
 
 bool DeviceHX711::isReady()
 {
-    return _data.read() == RESET;   // DOUT 低 = 数据就绪
+    return _data.read() == Low;   // DOUT 低 = 数据就绪
 }
 
 
@@ -106,7 +106,7 @@ bool DeviceHX711::waitReadyRetry(uint8_t retries, uint32_t ms)
 int32_t DeviceHX711::read()
 {
     // 阻塞等待数据就绪；首次读取最长 ~400ms（数据手册 Page 3）
-    while (_data.read() == SET)
+    while (_data.read() == High)
     {
     }
 
@@ -263,7 +263,7 @@ uint8_t DeviceHX711::_shiftIn()
     {
         _clock.high();
         delay_us(HX711_CLK_HALF_US);   // T2 ≥ 0.2µs，上升沿后数据稳定
-        if (_data.read() == SET)
+        if (_data.read() == High)
         {
             value |= mask;
         }
