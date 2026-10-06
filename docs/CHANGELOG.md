@@ -1,5 +1,57 @@
 # Changelog
 
+## 2026-10-06 — 引入 FreeRTOS 内核（V11.3.1）+ 目录规范化
+
+### Added
+
+- `freertos/`：FreeRTOS Kernel **V11.3.1**（上游 tag，MIT）。收录内核源码、`include/`、
+  **GCC** 移植层 `portable/GCC/ARM_CM4F`（本工程构建用）与 **RVDS** 移植层
+  `portable/RVDS/ARM_CM4F`（Keil/ARMCC 备用）、`portable/MemMang/heap_1~5.c`，
+  以及 `README.md`（版本/来源/双端口/Keil 用法说明）。
+- `code/inc/FreeRTOSConfig.h`：应用配置（`configCPU_CLOCK_HZ=240MHz`、`configTICK_RATE_HZ=1000`、
+  `configTOTAL_HEAP_SIZE=32KB`、`configPRIO_BITS=4`、`configMAX_SYSCALL_INTERRUPT_PRIORITY=5<<4`、
+  `configUSE_TICK_HOOK=1`，并将 `vPortSVCHandler/xPortPendSVHandler/xPortSysTickHandler`
+  映射到 CMSIS 的 `SVC_Handler/PendSV_Handler/SysTick_Handler`）。
+- `code/inc/rtos_conf.h`：`USE_FREERTOS` 编译期总开关（默认 1）。
+- `CMakeLists.txt`：新增 `option(USE_FREERTOS ... ON)`；为 RTOS 目标补充内核源文件、
+  `heap_4.c`、`GCC/ARM_CM4F/port.c` 及 include 路径，并传递 `-DUSE_FREERTOS=1/0`。
+
+### Changed
+
+- 移除旧 `FreeRTOS/`（**V9.0.0，仅含 RVDS/Keil 移植层，arm-none-eabi-gcc 无法编译**），
+  以 `freertos/`（小写，符合项目命名规范）替换为最新 V11.3.1。
+- `App/` → `app/`：`App/` 为真实目录，`app` 原是指向它的**跟踪型符号链接**（非重复目录）。
+  改为**真实小写目录 `app/`** 并删除符号链接，消除大小写并存缺陷（`git mv` 保留重命名历史）。
+- `code/src/gd32f4xx_it.c`：`SVC_Handler` / `PendSV_Handler` / `SysTick_Handler` 用
+  `#if !USE_FREERTOS` 屏蔽并注释原因（FreeRTOS 端口接管，避免重复定义）；裸机模式自动恢复。
+- `code/src/main.c`：按 `USE_FREERTOS` 分支——RTOS 下 `function_init()` 后创建 `default_task`
+  （忙轮询循环 `function_loop()`，**不加 vTaskDelay**）并 `vTaskStartScheduler()`，不再调用
+  `systick_config()`；裸机分支保持原 `while(1)` 主循环。
+- `code/src/systick.c`：新增 `vApplicationTickHook()`（`USE_FREERTOS` 下）以维持裸机
+  `get_tick()` 兼容（1 tick=1ms）；`systick_config()` 增加「RTOS 下勿调用」说明。
+
+### Verified
+
+- `debug` + `USE_FREERTOS=ON`（默认）：编译链接通过（RAM 40640B / FLASH 36204B）。
+- `debug` + `USE_FREERTOS=OFF`：编译链接通过（RAM 7392B / FLASH 29636B），验证裸机回退路径。
+- `release` + `USE_FREERTOS=ON`（-O2）：编译链接通过，无 FreeRTOS 相关告警。
+- **上板实测**（MickeyPlus V2.0.0 / DAP-Link / `/dev/ttyACM0`，`tests/test_string.py`）：
+  - `USE_FREERTOS=ON`：**35/35 通过（100%）**，INA228 `MFR=0x5449 / DEV=0x2281`，
+    压力测试 100/100、丢包 0%、平均响应 ~11.8ms。
+  - `USE_FREERTOS=OFF`（裸机）：**35/35 通过（100%）**，行为与 RTOS 一致，回退路径未被破坏。
+
+### Notes
+
+- `get_tick()` 由 Tick Hook 维持，`delay_us/ms` 为忙等、与 SysTick 无关，故 device 层遗留驱动
+  在 RTOS 下行为不变。
+- 内存管理用 `heap_4.c`（可释放 + 相邻空闲块合并），堆为内部静态数组 `ucHeap[]`，**无需改链接脚本**。
+- ⚠️ 后续若在 ISR 中调用 FreeRTOS API，该 NVIC 优先级必须 ≤ `configMAX_SYSCALL_INTERRUPT_PRIORITY`(5)。
+- Keil 工程：AC5 用 `portable/RVDS/ARM_CM4F`；AC6(armclang) 官方说明直接用 GCC 端口。
+- ⚠️ **软串口必须忙轮询**：`soft_uart_port` 是轮询式实现，`default_task` 中**不可加
+  `vTaskDelay`/`taskYIELD`**（否则轮询率降为 1kHz，115200 下丢字节 → 接收乱码）。
+  本次实测首版加 `vTaskDelay(1)` 导致乱码，改为忙轮询后 100% 通过。后续若改为
+  中断/DMA 收串口，方可让出 CPU。
+
 ## 2026-10-06 — Release 位操作驱动回归（-O2 延时扫描 + 软 SPI 上板）
 
 ### Verified

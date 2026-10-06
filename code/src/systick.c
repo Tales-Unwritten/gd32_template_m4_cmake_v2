@@ -34,6 +34,7 @@ OF SUCH DAMAGE.
 
 #include "gd32f4xx.h"
 #include "systick.h"
+#include "rtos_conf.h"
 
 static volatile uint32_t tick;   /* 1kHz 毫秒计数器，SysTick_Handler 中递增 */
 
@@ -55,6 +56,10 @@ void systick_config(void)
     NVIC_SetPriority(SysTick_IRQn, 0x00U);
 }
 
+/* ⚠️ USE_FREERTOS=1 时不应调用 systick_config()：
+ *   SysTick 由 FreeRTOS 的 xPortStartScheduler() 配置，优先级取自
+ *   configKERNEL_INTERRUPT_PRIORITY；此处硬编码 0x00 会覆盖它并破坏
+ *   内核临界区（BASEPRI）语义。裸机模式下仍正常使用。*/
 
 void delay_ms(uint32_t ms)
 {
@@ -82,3 +87,13 @@ uint32_t get_tick(void)
 {
     return tick;
 }
+
+#if USE_FREERTOS
+/* FreeRTOS 每 1ms 调用一次（configUSE_TICK_HOOK=1，运行于 ISR 上下文）。
+ * 作用：让裸机遗留的 get_tick()（device 层若干驱动用作毫秒时间戳）在
+ *        FreeRTOS 下继续有效，无需改动调用方。 */
+void vApplicationTickHook(void)
+{
+    tick_increment();
+}
+#endif /* USE_FREERTOS */

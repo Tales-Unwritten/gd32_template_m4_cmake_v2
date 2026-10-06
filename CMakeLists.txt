@@ -44,6 +44,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ============================================================
+# FreeRTOS（可选，默认开启）
+#   切换回裸机：cmake --preset debug -DUSE_FREERTOS=OFF
+#   软件侧的 USE_FREERTOS 开关定义见 code/inc/rtos_conf.h
+# ============================================================
+
+option(USE_FREERTOS "Build with FreeRTOS scheduler" ON)
+
+# ============================================================
 # Language Standard
 # ============================================================
 
@@ -219,6 +227,49 @@ target_compile_definitions(${PROJECT_NAME}.elf PRIVATE
     USE_STDPERIPH_DRIVER
     HSE_VALUE=25000000U
 )
+
+# ============================================================
+# FreeRTOS 内核 / 移植层
+# ------------------------------------------------------------
+#   内核版本：V11.3.1（freertos/）
+#   编译端口：GCC/ARM_CM4F（arm-none-eabi-gcc，本工程使用）
+#   备用端口：portable/RVDS/ARM_CM4F（Keil/ARMCC 工程使用，不参与本构建）
+#   内存管理：heap_4.c（可释放 + 相邻空闲块合并）
+# ============================================================
+
+set(FREERTOS_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/freertos)
+set(FREERTOS_PORT ${FREERTOS_DIR}/portable/GCC/ARM_CM4F)
+
+if(USE_FREERTOS)
+
+    target_sources(${PROJECT_NAME}.elf PRIVATE
+        # ── 内核 ────────────────────────────────────
+        ${FREERTOS_DIR}/tasks.c
+        ${FREERTOS_DIR}/list.c
+        ${FREERTOS_DIR}/queue.c
+        ${FREERTOS_DIR}/timers.c
+        ${FREERTOS_DIR}/event_groups.c
+        ${FREERTOS_DIR}/stream_buffer.c
+
+        # ── 内存管理 ────────────────────────────────
+        ${FREERTOS_DIR}/portable/MemMang/heap_4.c
+
+        # ── GCC Cortex-M4F 移植层 ───────────────────
+        ${FREERTOS_PORT}/port.c
+    )
+
+    target_include_directories(${PROJECT_NAME}.elf PRIVATE
+        ${FREERTOS_DIR}/include
+        ${FREERTOS_PORT}          # portable.h 靠此路径找到 portmacro.h
+    )
+
+    target_compile_definitions(${PROJECT_NAME}.elf PRIVATE USE_FREERTOS=1)
+
+else()
+
+    target_compile_definitions(${PROJECT_NAME}.elf PRIVATE USE_FREERTOS=0)
+
+endif()
 
 # ============================================================
 # Compile Options
