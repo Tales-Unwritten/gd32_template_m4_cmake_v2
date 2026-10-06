@@ -58,15 +58,19 @@ void systick_config(void)
 
 void delay_ms(uint32_t ms)
 {
-    ms = 40000 * ms;
-    while (ms--);
+    /* volatile：阻止 -O2 优化掉空转循环（否则延时为 0） */
+    volatile uint32_t n = 40000U * ms;
+    while (n--)
+    {
+    }
 }
 
 void delay_us(uint32_t us)
 {
-    us = 40 * us;
-    while (us--);
-
+    volatile uint32_t n = 40U * us;
+    while (n--)
+    {
+    }
 }
 
 void tick_increment(void)
