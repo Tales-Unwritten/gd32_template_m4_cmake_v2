@@ -1,5 +1,171 @@
 # Changelog
 
+## 2026-10-06 — Release 位操作驱动回归（-O2 延时扫描 + 软 SPI 上板）
+
+### Verified
+
+- `arm-none-eabi-objdump` 确认公共 `delay_us`/`delay_ms` 在 **-O2 下为真循环**（非 `bx lr`）；全项目位操作驱动延时来源已分类，**未发现新的「空转循环被优化掉」隐患**。
+- 实板（Release，DAP-Link + `/dev/ttyACM0`）：`inter_soft_spi` 驱动真实 W25Q128，`delay=0` 与 **`delay=1`（压 `delay_us` 路径）均 PASS**（JEDEC `EF 70 18`、擦写回读 MATCH）；`inter_i2c_bus` + INA228 `MFR=0x5449 / DEV=0x2281` OK。
+
+### Docs
+
+- `docs/tests/TEST_REPORT.md`：新增「七、2026-10-06 Release 位操作驱动回归」——延时来源分类表、上板结果、未覆盖项。
+
+### Notes
+
+- 未覆盖（板上无器件）：ds18b20/ds2401（1-Wire）、dhtnew、hc40xx、74hc*、shiftin/out、x9c10x、drv8825、ms5611、ads1115 —— 「优化掉」风险已排除，但**时序精度**需接器件 + 示波器实测。
+- `delay_us`/`delay_ms` 系数（40/40000）估算偏短约 17%，属精度维度（可用 DWT 标定）。
+- 验证用的临时改动（`function_init` 暂换软 SPI 自检、软 SPI `delay=1`）**均已还原**，工作区无残留。
+
+## 2026-10-06 — 软 I2C 波特率化改造（单参配置 + DWT 自标定）
+
+### Changed
+
+- `interface/inc/inter_i2c_bus.hpp`：`I2C_Bus_Info_t` 新增 `clock_speed`（目标 SCL Hz，默认 400k）与 `sys_clk_hz`（系统主频 Hz，默认 240M，**不依赖 `SystemCoreClock` 符号**）；构造函数收敛为单参 `explicit inter_i2c_bus(const I2C_Bus_Info_t&)`（去掉 `delay_us`）；成员 `_delay_val` → `_delay_count`。
+- `interface/src/inter_i2c_bus.cpp`：半周期延时改为**按波特率反算忙等次数** `_delay_count = sys_clk_hz / (clock_speed * 2 * 每循环周期)`；`_delay()` 用 `volatile` 忙等（防 -O2 优化为空）；「每循环周期」默认 **DWT 上电自标定**，并保留**固定值分支注释备用**（无 DWT 的平台）。
+- 调用点 `user/src/founction.cpp`：`inter_i2c_bus i2c_bus({portE, portE, pin2, pin3});`（默认 400k@240MHz）。
+
+### Verified
+
+- `debug` / `release` / `iap` 三套构建+链接通过。
+- 实板（DAP-Link + `/dev/ttyACM0`）：INA228 `MFR=0x5449 / DEV=0x2281`（正确）；W25Q128 硬件 SPI **PASS**。
+
+### Notes
+
+- 方案：按目标速率反算循环次数（`*2` = 半周期，每循环周期折算）；上半层不受影响（device 层持抽象 `i2c_bus*`；`I2C_Bus_Info_t` 仅 `founction.cpp` 一处构造）。
+- `inter_i2c_test_simple.hpp`（死代码）中 `inter_i2c_bus _bus;` 本就不可编译，未处理。
+
+## 2026-10-06 — 修复 delay_us/delay_ms 被 -O2 优化为空（软 I2C 读 INA228 错乱根因）
+
+### Fixed
+
+- `code/src/systick.c`：`delay_us()` / `delay_ms()` 的空转循环在 **-O2 下被优化成 `bx lr`（零延时）**。改用 `volatile` 计数循环恢复实际延时。
+  - 影响面：所有依赖 `delay_us/ms` 的位操作驱动（软 I2C / 软 SPI、ds18b20 / dht / hc40xx / 74hc / shiftin/out / x9c10x 等）在 Release 下延时均为 0。
+  - 现象：软 I2C 全速翻转（MHz 级）远超 INA228 400kHz 上限 → ACK 通过但读数据错乱（`MFR` 读成 `0x7FFF`，DEV `0x3FFF`）。
+  - （定位过程：先 A/B 排除 `inter_i2c_dev`/软 I2C 逻辑；再对比旧版 `hard_soft_i2c.c`；最后 `objdump` 发现 `delay_us` 只剩 `bx lr`。）
+
+### Verified
+
+- 实板（DAP-Link + `/dev/ttyACM0`）：修复后 INA228 `MFR=0x5449 / DEV=0x2281`（**正确**），Vbus=0（悬空，符合预期）；W25Q128 硬件 SPI **PASS**。
+- 说明：PE2/PE3 **无 I2C 复用功能**，硬 I2C 在该引脚对不可用（仅软 I2C）；此结论已记录。
+
+## 2026-10-06 — 测试文档更新：固定测试接口 + 实板回归
+
+### Docs
+
+- `docs/tests/TEST_REPORT.md`：新增「固定测试接口（硬件连线速查）」表——DAP-Link 调试串口 PA9/10、INA228 软 I2C PE2/PE3（ALERT **PG14**）、AT24C02 **PB6/PB7**、W25Q128 SPI4 **PF6/7/8/9**、RS485/RS232/OLED/LED；补充当前测试固件状态、烧录命令；新增「2026-10-06 复测（架构重构后回归）」小节。
+
+### Verified
+
+- 实板（DAP-Link + `/dev/ttyACM0`，烧录后复位）：上电自检 **W25Q128 硬件 SPI PASS**（JEDEC `EF 70 18`，Erase/Write/Readback MATCH，32B verified）。
+- **I2C（INA228）上板验证**：启用 `i2c_bus.init()` + `ina228_selftest()` 后自检全流程跑通，但读数异常（`MFR=0x7FFF`/`DEV=0x3FFF`，期望 `0x5449`/`0x2281`；Vbus/I=0）。**A/B 对比**（读路径临时改回 HEAD 内联写法）结果完全一致 → **排除 I2C 抽象化重构嫌疑**，属独立的芯片/接线现象，待硬件侧确认。
+
+### Changed
+
+- `user/src/founction.cpp`：`function_init()` 启用 `i2c_bus.init()` 并在启动时调用 `ina228_selftest()`（I2C 上板验证；W25Q128 自检保留）。
+
+## 2026-10-06 — I2C 设备层抽象化（依赖倒置落地）
+
+### Changed
+
+- `interface/inc/inter_i2c_dev.hpp` + `interface/src/inter_i2c_dev.cpp`：总线依赖 `inter_i2c_bus*` → `i2c_bus*`（include 由 `inter_i2c_bus.hpp` → `inter_i2c.hpp`）。
+- 31 个 device I2C 驱动（`device_24lc1025`/`abp2`/`ads1115`/`as5600`/`asdx`/`bh1750`/`cat24m01`/`cht8305`/`ds3232`/`eeprom`/`fram`/`gy521`/`hc4067`/`ina219/226/228/260/3221`/`lcd1602`/`mcp23017`/`mcp3424`/`mcp4725`/`mcp9808`/`mprls`/`pca9685`/`pcf85263`/`pcf8574`/`pcf8591`/`sht31`/`sht4x`/`tca9548`）的构造参数与成员类型 `inter_i2c_bus*`/`&` → `i2c_bus*`/`&`；include 同步改抽象头。
+- 隐式上转（`inter_i2c_bus*` → `i2c_bus*`）保证现有调用点**源码兼容，零改动**；硬 I2C（`i2c_hw_bus`）现可注入设备层。
+- 保持指针注入（非引用）；`i2c_bus` 基类未扩充（设备层实际只用基类方法）。
+
+### Fixed
+
+- `device/src/device_rotarydecoder.cpp`：原先经 `inter_i2c_bus.hpp` 传递获得 SDK 宏 `SET`，改抽象头后缺失；改用平台无关的 `!= 0u` 比较（`PCF8574::read` 返回 0/1）。
+
+### Verified
+
+- `cmake --build --preset debug` / `--preset release` / `--preset iap` 全部构建+链接通过。
+- 静态检查：`device/` 与 `inter_i2c_dev` 层已无具体 `inter_i2c_bus` 类型引用，也无 `inter_i2c_bus.hpp` 包含。
+
+## 2026-10-06 — 软 SPI 时序枚举（对齐 STM32 版）
+
+### Changed
+
+- `interface/inc/inter_soft_spi.hpp`：新增 `soft_mode_enum_t`（`soft_mode_0..3`）与 `soft_order_enum_t`（`MSB`/`LSB`）；`SoftSpiConfig.mode`/`bit_order` 由 `uint8_t` 改为上述枚举；`set_mode()`/`set_bit_order()` 形参同步改枚举；私有成员 `_cs_active_level` 由 `bool` 改回 `polarity`。
+- `interface/src/inter_soft_spi.cpp`：构造 / `set_mode` / `set_bit_order` / `_transfer_byte_core` / `cs_select` / `cs_deselect` 适配枚举；CS 控制改用 `io_ctrl::write(polarity)`。
+- 调用点：`user/src/founction.cpp` 的 `w25q_spi` 位置化初始化 `0, 0, 0` → `soft_mode_0, MSB, 0`。
+
+### Verified
+
+- `cmake --build --preset debug` / `--preset release` / `--preset iap` 全部构建+链接通过。
+
+## 2026-10-06 — 接口层架构统一：I2C/UART 抽象基类 + 串口模板化
+
+### Added
+
+- `interface/inc/inter_i2c.hpp`：新增 I2C 抽象基类 `i2c_bus`（软/硬 I2C 统一入口），含 `read_bytes()` 默认实现（逐字节 + 末字节 NACK + STOP）。
+- `interface/inc/inter_usart.hpp`：新增串口抽象基类 `usart_port_base`（init/deinit/is_initialized/send_data/send_data_it/buffer/periph/rx_buf_capacity）。
+
+### Changed
+
+- **I2C**：`inter_i2c_bus`（软）与 `i2c_hw_bus`（硬）改为 `: public i2c_bus` 并全量 `override`；软 `wait_ack` 返回 `uint8_t`→`bool`；`is_busy()` 加 `const`。
+- 硬 I2C `i2c_hw_bus`：新增 `read_bytes()`（GD32 F4 时序：`len==1`/`i==len-2` 提前 NACK）与 `bus_recovery()`（关外设→GPIO 开漏 9 时钟 + STOP→重配外设）；抽出私有 `_configure_peripheral()` 供 init/recovery 复用。
+- `inter_i2c_dev.cpp`：`read_16bit()`/`freedom_read()` 读取段改用 `_bus->read_bytes(...)`（`.hpp` 成员类型保持 `inter_i2c_bus*`，与 STM32 版一致）。
+- **UART**：`usart_port`、`soft_uart_port` 模板化为 `template <uint16_t RX_BUF_SIZE = 256> : public usart_port_base`；RX 缓冲由堆 `new[]` 改为编译期静态数组（**零堆分配**）；模板成员定义内联于头文件，ISR/`g_port_map` 保留在 `.cpp`。
+- `UsartPortConfig` 删除 `rx_buf_size` 字段（改由模板参数承载）。
+- `g_port_map` 改为 `usart_port_base*`，ISR 经基类虚接口分发；注册/注销改为非模板自由函数 `usart_port_register/unregister`。
+- 调用点更新：`device_serial.{hpp,cpp}`（`usart_port<256>`）、`device_mhzco2.{hpp,cpp}`（`usart_port_base&`）、`iap_boot.cpp`（`usart_port<512>`）、`modbus.cpp`/`string_pro.cpp`（`extern soft_uart_port<256>`）、`user/src/founction.cpp`（`soft_uart_port<256>`）。
+
+### Verified
+
+- `cmake --build --preset debug` / `--preset release` / `--preset iap` 全部构建+链接通过（IAP 四目标：boot/app_a/app_b/template）。
+
+### Notes
+
+- 保留 GD32 平台约定：`port_enum_t`/`pin_enum_t`/`af_enum_t`、`io_ctrl` 4 参 init、`mode`+`otype` 分离；未引入 STM32 的 `GPIO_TypeDef*`/`afio_enum_t`。
+- 未做 DMA（后续单独立项）；未改软串口发送时序（另项）。
+- 权衡（**已决策，暂不改**）：为支持模板化，`inter_usart.hpp`/`inter_soft_uart.hpp` 现直接 include GD32 SDK 头（设备/应用层会传递性引入）。经评估，嵌入式场景下这种耦合可接受，**不做"下沉为非模板自由函数"**（留作可选后续项）。
+
+## 2026-10-06 — io_ctrl 枚举化迁移（类型安全，全项目适配）
+
+### Changed
+
+- `interface/inc/inter_io_ctrl.hpp`：GPIO 参数由 GD32 SDK 整型宏改为项目枚举
+  （`port_enum_t`/`pin_enum_t`/`mode_enum_t`/`pull_enum_t`/`speed_enum_t`/`otype_enum_t`/`af_enum_t`），
+  `read()`/`read_output()` 返回 `polarity`。
+- 新增哨兵 `port_enum_t::port_none = 0`（与既有 `pin_none` 对应，表示"未绑定"）；
+  修正枚举笔误 `Hig` → `High`（`active_high = High`）。
+- 接口层 11 个 config 结构体字段类型改为枚举：`UsartPortConfig`、`SpiPortConfig`、`SoftSpiConfig`、
+  `SoftUartConfig`、`I2C_Bus_Info_t`、`I2cHwConfig`、`AdcChannelConfig`、`CanPortConfig`、
+  `DacPortConfig`、`ExtiConfig`、`TimerChannelConfig`（`cs_active_level`→`polarity`、`pull`→`pull_enum_t`）。
+- 全项目调用点迁移（约 50 个文件）：
+  - `interface/src/` 11 个（init/reinit/set_af 参数、`read()` 与 `High`/`Low` 比较）；
+  - `device/inc/` 15 个（INA 系列 + 74hc138/154/590、hc4051~4067_gpio、shiftin/shiftout、x9c10x）；
+  - `device/src/` 15 个（INA 系列 + dhtnew/ds18b20/ds2401/hx711/mcp_dac/drv8825/serial/w25q128_flash/pca9685 等）；
+  - `user/src/founction.cpp`、`protocol/iap/boot/src/iap_boot.cpp` 的实例化/构造点。
+- 未改动任何传给 GD32 SDK 函数的宏（`usart_*`/`spi_*`/`adc_*`/`syscfg_exti_line_config` 等仍用 SDK 宏）。
+
+### Verified
+
+- 逐编译单元检查（`build/release/compile_commands.json`，98 TU）：**0 失败**。
+- `cmake --build --preset debug` / `--preset release` / `--preset iap` 均构建+链接通过
+  （release：FLASH 19668B/2MB，RAM 6608B/704KB；IAP：boot/app_a/app_b + template 四目标）。
+- 未被任何 TU 引用的 header-only 驱动（74hc138/154/590、hc4051/4052/4053/4067_gpio、shiftin/shiftout、x9c10x）
+  用项目编译参数单独 `-fsyntax-only` 验证通过。
+
+## 2026-10-06 — 构建配置审计 + clangd 配置接入
+
+### Added
+
+- 项目根新增 `.clangd`：压制 GD32 SDK 头文件的 clangd 假报错
+  `pp_including_mainfile_in_preamble`。单独打开某个库头文件（如 `gd32f4xx_gpio.h`）时，
+  包含链 `gd32f4xx_xxx.h -> gd32f4xx.h -> gd32f4xx_libopt.h -> gd32f4xx_xxx.h` 成环，
+  clangd 构建 preamble 时误判为"主文件被递归包含"（include guard 无法拦截）。
+  该配置仅影响 IDE 语言服务，不影响 GCC / CMake 实际构建。
+- 注：`.clangd` 目前被 `.gitignore`（第 14 行，IDE 配置项）忽略；如需纳入版本控制需取消忽略。
+
+### Verified
+
+- `clangd --check=Firmware/.../gd32f4xx_gpio.h` 复现原报错，加 `.clangd` 后该诊断消失且无配置告警。
+- `cmake --preset release && cmake --build --preset release` 全量构建通过
+  （FLASH 19652B/2MB，RAM 6616B/704KB，TCMRAM 0B）。
+- 构建配置审计（只读，未改动源码）：发现的隐患见会话记录，本文件仅登记已实施变更。
+
 ## 2026-08-18 — IAP 目录结构重构：boot / application / common 分层
 
 ### Changed
