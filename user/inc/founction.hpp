@@ -3,11 +3,6 @@
 #include "link.h"
 
 #ifdef __cplusplus
-#include "inter_usart.hpp"
-#include "device_serial.hpp"
-#endif
-
-#ifdef __cplusplus
 extern "C" {
 #endif
 
