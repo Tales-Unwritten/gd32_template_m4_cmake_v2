@@ -24,8 +24,8 @@
 | PB7 (137) | 24C02_SDA | I2C SDA | AT24C02 EEPROM |
 | PC1 (27) | OLED_SCL | I2C SCL | OLED 显示屏 |
 | PC2 (28) | OLED_SDA | I2C SDA | OLED 显示屏 |
-| PC5 (45) | LED1 | LED | 低电平亮 |
-| PC4 (44) | LED2 | LED | 低电平亮 |
+| PC5 (45) | user_led | LED | 低电平亮 |
+| PC4 (44) | flash_led | LED | 低电平亮 |
 | PA7 (43) | LED4 | LED | 低电平亮 |
 | PG14 (129) | ALERT | INA228 ALERT | 传感器报警 |
 | PB15 (76) | LCD_BL | LCD 背光 | PWM 控制 |

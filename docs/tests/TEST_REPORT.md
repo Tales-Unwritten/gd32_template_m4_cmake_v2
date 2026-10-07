@@ -20,7 +20,7 @@
 | RS485 | USART1 | PA2=TX, PA3=RX；**PG13=DE** | 115200-8N1 | `device/src/device_serial.cpp`（`rs485_uart`） |
 | RS232 | USART2 | PD5=TX, PD6=RX | 115200-8N1 | `device/src/device_serial.cpp`（`rs232_uart`） |
 | OLED | I2C | PC1=SCL, PC2=SDA | — | `docs/PINOUT.md` |
-| LED1 / LED2 / LED4 | GPIO | PC4 / PC5 / PA7 | 低电平亮 | `user/src/function.cpp`（`led1/2/3`） |
+| user_led / flash_led / LED4 | GPIO | PC4 / PC5 / PA7 | 低电平亮 | `user/src/function.cpp`（`user_led/2/3`） |
 
 ### 当前测试固件状态（`function_init()`）
 

@@ -5,18 +5,18 @@
 #include "systick.h"
 
 
-#define RCU_LED1  	RCU_GPIOC   // GPIOA的时钟
-#define RCU_LED2  	RCU_GPIOC   // GPIOA的时钟
-#define RCU_LED3  	RCU_GPIOA   // GPIOA的时钟
+#define RCU_user_led  	RCU_GPIOC   // GPIOA的时钟
+#define RCU_flash_led  	RCU_GPIOC   // GPIOA的时钟
+#define RCU_state_led  	RCU_GPIOA   // GPIOA的时钟
 
-#define PORT_LED1 	GPIOC				// GPIOA的端口
-#define PORT_LED2 	GPIOC				// GPIOA的端口
-#define PORT_LED3 	GPIOA				// GPIOA的端口
+#define PORT_user_led 	GPIOC				// GPIOA的端口
+#define PORT_flash_led 	GPIOC				// GPIOA的端口
+#define PORT_state_led 	GPIOA				// GPIOA的端口
 
 
-#define PIN_LED1 		GPIO_PIN_5  // GPIOA的引脚
-#define PIN_LED2 		GPIO_PIN_4  // GPIOA的引脚
-#define PIN_LED3 		GPIO_PIN_7  // GPIOA的引脚
+#define PIN_user_led 		GPIO_PIN_5  // GPIOA的引脚
+#define PIN_flash_led 		GPIO_PIN_4  // GPIOA的引脚
+#define PIN_state_led 		GPIO_PIN_7  // GPIOA的引脚
 
 void led_gpio_config(void); 	    // led gpio引脚配置
 void led_on(uint8_t led_num);       // 点亮LED

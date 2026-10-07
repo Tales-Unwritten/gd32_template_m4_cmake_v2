@@ -159,7 +159,7 @@ void USART1_IRQHandler(void)
 			{
 				if (Rs485_Receive_Buffer[i].Buffer_Status == 0)
 				{
-					// led_toggle(2); // 切换LED2状态
+					// led_toggle(2); // 切换flash_led状态
 					Rs485_Receive_Buffer[i].Buffer_Length = Temp_Recevice_Count;
 					memcpy(Rs485_Receive_Buffer[i].Buffer, Temp_Recevice_Buffer, Temp_Recevice_Count);
 					// rs485_send_it_data(Rs485_Receive_Buffer[i].Buffer, Rs485_Receive_Buffer[i].Buffer_Length);
@@ -172,7 +172,7 @@ void USART1_IRQHandler(void)
 		memset(Temp_Recevice_Buffer, 0, sizeof(Temp_Recevice_Buffer));
 		Temp_Recevice_Count = 0;
 	}
-	
+
 	if (usart_interrupt_flag_get(RS485_USART, USART_INT_FLAG_TBE) == SET) /* 发送缓冲区空中断 */
 	{
 		if (Rs485_IT_Secd_Buffer.Finish_Flag == RESET && Send_Count < Rs485_IT_Secd_Buffer.Buffer_Length)

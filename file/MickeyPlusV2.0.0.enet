@@ -401,7 +401,7 @@
                 "44": {
                     "name": "PC4",
                     "number": "44",
-                    "net": "LED2",
+                    "net": "flash_led",
                     "props": {
                         "Pin Number": "44"
                     }
@@ -409,7 +409,7 @@
                 "45": {
                     "name": "PC5",
                     "number": "45",
-                    "net": "LED1",
+                    "net": "user_led",
                     "props": {
                         "Pin Number": "45"
                     }
@@ -6461,7 +6461,7 @@
                 "Add into BOM": "yes",
                 "Convert to PCB": "yes",
                 "Symbol": "da39591e6b2b4ebbbda492cb36d92588",
-                "Designator": "LED1",
+                "Designator": "user_led",
                 "Name": "={Manufacturer Part}",
                 "Device": "2bbfef3f4e034d55b84a9e91dcb51d4a",
                 "Reuse Block": "",
@@ -6497,7 +6497,7 @@
                 "1": {
                     "name": "K",
                     "number": "1",
-                    "net": "LED1",
+                    "net": "user_led",
                     "props": {
                         "Pin Number": "1"
                     }
@@ -6517,7 +6517,7 @@
                 "Add into BOM": "yes",
                 "Convert to PCB": "yes",
                 "Symbol": "da39591e6b2b4ebbbda492cb36d92588",
-                "Designator": "LED2",
+                "Designator": "flash_led",
                 "Name": "={Manufacturer Part}",
                 "Device": "2bbfef3f4e034d55b84a9e91dcb51d4a",
                 "Reuse Block": "",
@@ -6553,7 +6553,7 @@
                 "1": {
                     "name": "K",
                     "number": "1",
-                    "net": "LED2",
+                    "net": "flash_led",
                     "props": {
                         "Pin Number": "1"
                     }
@@ -6573,7 +6573,7 @@
                 "Add into BOM": "yes",
                 "Convert to PCB": "yes",
                 "Symbol": "da39591e6b2b4ebbbda492cb36d92588",
-                "Designator": "LED3",
+                "Designator": "state_led",
                 "Name": "={Manufacturer Part}",
                 "Device": "2bbfef3f4e034d55b84a9e91dcb51d4a",
                 "Reuse Block": "",
@@ -9913,7 +9913,7 @@
                 "14": {
                     "name": "PB1",
                     "number": "14",
-                    "net": "DAP_LED1",
+                    "net": "DAP_user_led",
                     "props": {
                         "Pin Number": "14"
                     }
@@ -11844,7 +11844,7 @@
                 "35": {
                     "name": "35",
                     "number": "35",
-                    "net": "LED2",
+                    "net": "flash_led",
                     "props": {
                         "Pin Number": "35"
                     }
@@ -11868,7 +11868,7 @@
                 "38": {
                     "name": "38",
                     "number": "38",
-                    "net": "LED1",
+                    "net": "user_led",
                     "props": {
                         "Pin Number": "38"
                     }
@@ -13934,7 +13934,7 @@
                 "1": {
                     "name": "K",
                     "number": "1",
-                    "net": "DAP_LED1",
+                    "net": "DAP_user_led",
                     "props": {
                         "Pin Number": "1"
                     }
@@ -15157,14 +15157,14 @@
                     "TrackPhysics": ""
                 }
             },
-            "LED2": {
-                "net": "LED2",
+            "flash_led": {
+                "net": "flash_led",
                 "ruleMap": {
                     "TrackPhysics": ""
                 }
             },
-            "LED1": {
-                "net": "LED1",
+            "user_led": {
+                "net": "user_led",
                 "ruleMap": {
                     "TrackPhysics": ""
                 }
@@ -15943,8 +15943,8 @@
                     "TrackPhysics": ""
                 }
             },
-            "DAP_LED1": {
-                "net": "DAP_LED1",
+            "DAP_user_led": {
+                "net": "DAP_user_led",
                 "ruleMap": {
                     "TrackPhysics": ""
                 }
