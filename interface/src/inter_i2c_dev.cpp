@@ -1,8 +1,7 @@
 
 #include "inter_i2c_dev.hpp"
 
-inter_i2c_dev::inter_i2c_dev(i2c_bus *bus, uint8_t addr)
-    : _bus(bus), _addr(addr)
+inter_i2c_dev::inter_i2c_dev(i2c_bus *bus, uint8_t addr) : _bus(bus), _addr(addr)
 {
 }
 
@@ -44,8 +43,8 @@ void inter_i2c_dev::write_16bit(uint8_t reg, uint16_t data)
 uint16_t inter_i2c_dev::read_16bit(uint8_t reg)
 {
     uint16_t data = 0;
-    uint8_t  raw[2];
-    bool     ok = false;
+    uint8_t raw[2];
+    bool ok = false;
     _err = 0;
 
     _bus->lock();
@@ -61,7 +60,7 @@ uint16_t inter_i2c_dev::read_16bit(uint8_t reg)
             _bus->write_byte((_addr << 1) | 0x01);
             if (_bus->wait_ack())
             {
-                _bus->read_bytes(raw, 2);   // 末字节 NACK + STOP 已在内部完成
+                _bus->read_bytes(raw, 2); // 末字节 NACK + STOP 已在内部完成
                 data = (uint16_t)((raw[0] << 8) | raw[1]);
                 ok = true;
             }
@@ -83,17 +82,26 @@ uint16_t inter_i2c_dev::read_16bit(uint8_t reg)
 
 void inter_i2c_dev::freedom_write(uint8_t reg, uint64_t data, uint8_t length)
 {
-    if (length == 0 || length > 8) return;
+    if (length == 0 || length > 8)
+        return;
     _err = 0;
 
     _bus->lock();
 
     _bus->start();
     _bus->write_byte(_addr << 1);
-    if (!_bus->wait_ack()) { _err = 1; goto exit; }
+    if (!_bus->wait_ack())
+    {
+        _err = 1;
+        goto exit;
+    }
 
     _bus->write_byte(reg);
-    if (!_bus->wait_ack()) { _err = 1; goto exit; }
+    if (!_bus->wait_ack())
+    {
+        _err = 1;
+        goto exit;
+    }
 
     for (int8_t i = length - 1; i >= 0; i--)
     {
@@ -113,9 +121,10 @@ exit:
 
 bool inter_i2c_dev::freedom_read(uint8_t reg, uint64_t *data, uint8_t length)
 {
-    if (!data || length == 0 || length > 8) return false;
+    if (!data || length == 0 || length > 8)
+        return false;
     *data = 0;
-    bool    success = false;
+    bool success = false;
     uint8_t raw[8];
     _err = 0;
 
@@ -123,16 +132,28 @@ bool inter_i2c_dev::freedom_read(uint8_t reg, uint64_t *data, uint8_t length)
 
     _bus->start();
     _bus->write_byte(_addr << 1);
-    if (!_bus->wait_ack()) { _err = 1; goto exit; }
+    if (!_bus->wait_ack())
+    {
+        _err = 1;
+        goto exit;
+    }
 
     _bus->write_byte(reg);
-    if (!_bus->wait_ack()) { _err = 1; goto exit; }
+    if (!_bus->wait_ack())
+    {
+        _err = 1;
+        goto exit;
+    }
 
     _bus->start();
     _bus->write_byte((_addr << 1) | 0x01);
-    if (!_bus->wait_ack()) { _err = 1; goto exit; }
+    if (!_bus->wait_ack())
+    {
+        _err = 1;
+        goto exit;
+    }
 
-    _bus->read_bytes(raw, length);   // 末字节 NACK + STOP 已在内部完成
+    _bus->read_bytes(raw, length); // 末字节 NACK + STOP 已在内部完成
     for (uint8_t i = 0; i < length; i++)
     {
         *data = (*data << 8) | raw[i];

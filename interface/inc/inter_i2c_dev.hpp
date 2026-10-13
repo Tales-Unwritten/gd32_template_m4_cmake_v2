@@ -6,14 +6,14 @@
 
 class inter_i2c_dev
 {
-public:
+  public:
     inter_i2c_dev(i2c_bus *bus, uint8_t addr);
 
-    void     write_16bit(uint8_t reg, uint16_t data);
+    void write_16bit(uint8_t reg, uint16_t data);
     uint16_t read_16bit(uint8_t reg);
 
-    void     freedom_write(uint8_t reg, uint64_t data, uint8_t length);
-    bool     freedom_read(uint8_t reg, uint64_t *data, uint8_t length);
+    void freedom_write(uint8_t reg, uint64_t data, uint8_t length);
+    bool freedom_read(uint8_t reg, uint64_t *data, uint8_t length);
 
     /**
      * @brief 设备探测：仅发地址字节检查 ACK，不读写寄存器
@@ -34,10 +34,10 @@ public:
      */
     uint8_t lastError();
 
-private:
+  private:
     i2c_bus *_bus;
     uint8_t _addr;
-    uint8_t _err = 0;   // 0 = OK, 1 = NACK / 总线错误
+    uint8_t _err = 0; // 0 = OK, 1 = NACK / 总线错误
 };
 
 #endif /* __cplusplus */

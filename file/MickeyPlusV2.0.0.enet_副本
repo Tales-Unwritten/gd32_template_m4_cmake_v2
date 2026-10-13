@@ -265,7 +265,7 @@
                 "27": {
                     "name": "PC1",
                     "number": "27",
-                    "net": "OLED_SCL",
+                    "net": "oled_SCL",
                     "props": {
                         "Pin Number": "27"
                     }
@@ -273,7 +273,7 @@
                 "28": {
                     "name": "PC2",
                     "number": "28",
-                    "net": "OLED_SDA",
+                    "net": "oled_SDA",
                     "props": {
                         "Pin Number": "28"
                     }
@@ -1389,7 +1389,7 @@
                 "19": {
                     "name": "CS#",
                     "number": "19",
-                    "net": "OLED_SDA",
+                    "net": "oled_SDA",
                     "props": {
                         "Pin Number": "19"
                     }
@@ -8078,7 +8078,7 @@
                 "3D Model Title": "",
                 "3D Model Transform": "",
                 "Description": "",
-                "DeviceName": "OLED",
+                "DeviceName": "oled",
                 "FootprintName": "oled"
             },
             "pinInfoMap": {
@@ -8101,7 +8101,7 @@
                 "3": {
                     "name": "SCL",
                     "number": "3",
-                    "net": "OLED_SCL",
+                    "net": "oled_SCL",
                     "props": {
                         "Pin Number": "3"
                     }
@@ -8109,7 +8109,7 @@
                 "4": {
                     "name": "SDA",
                     "number": "4",
-                    "net": "OLED_SDA",
+                    "net": "oled_SDA",
                     "props": {
                         "Pin Number": "4"
                     }
@@ -11764,7 +11764,7 @@
                 "25": {
                     "name": "25",
                     "number": "25",
-                    "net": "OLED_SDA",
+                    "net": "oled_SDA",
                     "props": {
                         "Pin Number": "25"
                     }
@@ -11772,7 +11772,7 @@
                 "26": {
                     "name": "26",
                     "number": "26",
-                    "net": "OLED_SCL",
+                    "net": "oled_SCL",
                     "props": {
                         "Pin Number": "26"
                     }
@@ -15097,8 +15097,8 @@
                     "TrackPhysics": ""
                 }
             },
-            "OLED_SDA": {
-                "net": "OLED_SDA",
+            "oled_SDA": {
+                "net": "oled_SDA",
                 "ruleMap": {
                     "TrackPhysics": ""
                 }
@@ -15109,8 +15109,8 @@
                     "TrackPhysics": ""
                 }
             },
-            "OLED_SCL": {
-                "net": "OLED_SCL",
+            "oled_SCL": {
+                "net": "oled_SCL",
                 "ruleMap": {
                     "TrackPhysics": ""
                 }

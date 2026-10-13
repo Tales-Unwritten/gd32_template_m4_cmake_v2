@@ -19,7 +19,7 @@
 | **W25Q128** SPI Flash | SPI4 | **PF6=CS, PF7=CLK, PF8=MISO, PF9=MOSI** | AF5；硬 SPI MODE3/PSC2；软 SPI MODE0 | `user/src/function.cpp`（`w25q_spi` 软 / `w25q_hw_spi` 硬） |
 | RS485 | USART1 | PA2=TX, PA3=RX；**PG13=DE** | 115200-8N1 | `device/src/device_serial.cpp`（`rs485_uart`） |
 | RS232 | USART2 | PD5=TX, PD6=RX | 115200-8N1 | `device/src/device_serial.cpp`（`rs232_uart`） |
-| OLED | I2C | PC1=SCL, PC2=SDA | — | `docs/PINOUT.md` |
+| oled | I2C | PC1=SCL, PC2=SDA | — | `docs/PINOUT.md` |
 | user_led / flash_led / LED4 | GPIO | PC4 / PC5 / PA7 | 低电平亮 | `user/src/function.cpp`（`user_led/2/3`） |
 
 ### 当前测试固件状态（`function_init()`）

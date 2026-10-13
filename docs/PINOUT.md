@@ -22,8 +22,8 @@
 | PE3 (2) | I2C_SDA1 | I2C1 SDA | INA228/INA226 |
 | PB6 (136) | 24C02_SCL | I2C SCL | AT24C02 EEPROM |
 | PB7 (137) | 24C02_SDA | I2C SDA | AT24C02 EEPROM |
-| PC1 (27) | OLED_SCL | I2C SCL | OLED 显示屏 |
-| PC2 (28) | OLED_SDA | I2C SDA | OLED 显示屏 |
+| PC1 (27) | oled_SCL | I2C SCL | oled 显示屏 |
+| PC2 (28) | oled_SDA | I2C SDA | oled 显示屏 |
 | PC5 (45) | user_led | LED | 低电平亮 |
 | PC4 (44) | flash_led | LED | 低电平亮 |
 | PA7 (43) | LED4 | LED | 低电平亮 |
