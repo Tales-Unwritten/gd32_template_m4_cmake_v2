@@ -761,6 +761,7 @@ pacman -S mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
   - **Gitee**（主仓库）：`origin` / `gitee` → `https://gitee.com/addiction_28/gd32_-template_-m4_-cmake_v2.git`
   - **GitHub**（镜像）：`github` → `git@github.com:Tales-Unwritten/gd32_template_m4_cmake_v2.git`
 - **当前开发分支**：`planB`
+- **FreeRTOS 维护说明**：本分支（`planB`）以裸机 + 协议栈重构为主线，**FreeRTOS 部分不作重点维护**（仅保留可编译集成，不再迭代）；相关内核裁剪、集成与练习内容已迁移到 **`practice`** 分支维护。
 - 源码文件（`.c/.h/.cpp/.hpp/.s/.S`）强制 LF 换行（见 [.gitattributes](.gitattributes)）
 - `build/`、`__pycache__/`、`compile_commands.json`、编译产物均被 [.gitignore](.gitignore) 忽略
 - IDE 配置文件（`.zed/`）提交至仓库，团队共享一致性配置

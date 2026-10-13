@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-13 — 分支维护说明：FreeRTOS 迁出 `planB`
+
+### Docs
+
+- `README.md`：「Git 约定」新增 **FreeRTOS 维护说明**——`planB` 分支以裸机 + 协议栈
+  重构为主线，**FreeRTOS 部分不作重点维护**（仅保留可编译集成，不再迭代）；相关内核
+  裁剪、集成与练习内容迁移到 **`practice`** 分支维护。
+
+### Notes
+
+- 仅文档调整，无代码变更。
+
 ## 2026-10-06 — FreeRTOS API 编辑器跳转索引 + 两项配置补全
 
 ### Added
