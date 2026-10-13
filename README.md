@@ -772,3 +772,4 @@ pacman -S mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
 ## 许可
 
 本项目为内部嵌入式开发模板，基于 GD32 标准外设库构建。
+
