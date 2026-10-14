@@ -13,6 +13,10 @@ compile_commands.json
 .vscode/
 .clangd
 
+# Agent skills & local docs (local-only, not shared via VCS)
+.agents/
+docs/
+
 # Object files
 *.o
 *.obj
@@ -39,3 +43,7 @@ desktop.ini
 
 # Large reference docs (35MB PDF, not for VCS)
 file/*.pdf
+
+# EasyEDA project files (local-only)
+file/*.eprj2
+file/*.enet*

@@ -1,4 +1,7 @@
 [
+  // GDB 调试配置（probe-rs）
+  // 使用前先在终端启动 GDB server（probe-rs 默认端口 1337）：
+  //   probe-rs gdb --speed 4000 --protocol swd --chip STM32F429ZI
   {
     "label": "DAPLink Debug",
     "adapter": "GDB",
@@ -6,7 +9,7 @@
     "program": "build/debug/gd32f470_template.elf",
     "cwd": "$ZED_WORKTREE_ROOT",
     "initializeCommands": [
-      "target extended-remote :3333",
+      "target extended-remote :1337",
       "monitor reset halt",
       "load",
     ],
@@ -15,7 +18,7 @@
       "args": [
         "-q",
         "-ex",
-        "target extended-remote :3333",
+        "target extended-remote :1337",
         "build/debug/gd32f470_template.elf",
       ],
     },
