@@ -55,4 +55,10 @@
     "tags": ["flash"],
     "reveal": "always"
   },
+  {
+    "label": "Push All (Gitee + GitHub)",
+    "command": "git push origin HEAD && git push github HEAD",
+    "tags": ["git"],
+    "reveal": "always"
+  },
 ]
