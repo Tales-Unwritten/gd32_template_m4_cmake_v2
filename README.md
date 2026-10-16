@@ -1,11 +1,9 @@
 # GD32F470 嵌入式开发模板
 
 基于 **GD32F470 / GD32F450** 的工业级固件模板项目，CMake + arm-none-eabi-gcc 构建，
-支持 **Modbus RTU**、**ASCII 字符串指令** 和 **HEX 指令** 三协议栈。
+支持 **Modbus RTU**、**ASCII 字符串指令** 和 **HEX 指令** 三协议栈 （部分协议未开发完，有更新打算，持续更新中）。
 
 > 开发板：MickeyPlus V2.0.0 (GD32F450ZGT6 / GD32F470ZIT6, 144-pin LQFP)
-> 引脚表：[docs/pinout.md](docs/pinout.md) | 开发规范：[.agents/skills/my-gd-skill/SKILL.md](.agents/skills/my-gd-skill/SKILL.md)
-> 变更日志：[docs/changelog.md](docs/changelog.md)
 
 ---
 
