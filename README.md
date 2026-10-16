@@ -1,13 +1,11 @@
 # GD32F470 嵌入式开发模板
 
+
 基于 **GD32F470 / GD32F450** 的工业级固件模板项目，CMake + arm-none-eabi-gcc 构建，
-支持 **Modbus RTU**、**ASCII 字符串指令** 和 **HEX 指令** 三协议栈，
-可选集成 **FreeRTOS** 调度内核。
+支持 **Modbus RTU**、**ASCII 字符串指令** 和 **HEX 指令** 三协议栈 （部分协议未开发完，有更新打算，持续更新中）。
 
 > 开发板：MickeyPlus V2.0.0 (GD32F450ZGT6 / GD32F470ZIT6, 144-pin LQFP)
-> 调试/烧录：**probe-rs**（SWD，替代已弃用的 OpenOCD）
-> 引脚表、变更日志、开发规范等文档位于本地 `docs/` 与 `.agents/` 目录（**不纳入 Git 版本管理**）
-
+本分支重点在裸机开发，FreeRTOS不作为更新重点，仅保留配置和部分测试内容
 ---
 
 ## 快速开始
