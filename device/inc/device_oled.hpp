@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "inter_i2c_bus.hpp"
 #include "inter_i2c_dev.hpp"
 
 /**
@@ -48,7 +49,8 @@ public:
      * @param dev  已构建好、且其总线已 init() 的 I2C 设备
      * @param ctrl 控制器类型（默认 SSD1306；1.3" 屏请传 Controller::SH1106）
      */
-    explicit oled(inter_i2c_bus &bus, Controller ctrl = Controller::SSD1306) noexcept;
+
+    explicit oled(inter_i2c_bus *bus, uint8_t addr =0x3C, Controller ctrl = Controller::SH1106) noexcept;
     ~oled() = default;
 
     oled(const oled &)            = delete;

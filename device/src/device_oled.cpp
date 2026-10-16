@@ -38,8 +38,9 @@ uint8_t u32ToStr(char *buf, uint32_t num)
 //==============================================================================
 // 构造
 //==============================================================================
-oled::oled(inter_i2c_bus &bus, Controller ctrl) noexcept
-    : _dev(bus), _colOffset(static_cast<uint8_t>(ctrl))
+
+oled:: oled(inter_i2c_bus *bus, uint8_t addr , Controller ctrl) noexcept
+    : _dev(bus,addr), _colOffset(static_cast<uint8_t>(ctrl))
 {
 }
 
@@ -116,6 +117,8 @@ void oled::init()
     }
 
     delay_ms(100);
+    clear();
+    delay_ms(10);
 }
 
 //==============================================================================

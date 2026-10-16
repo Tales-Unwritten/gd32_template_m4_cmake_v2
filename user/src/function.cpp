@@ -40,7 +40,6 @@ static TaskHandle_t xFlashLedHand = NULL;
 inter_i2c_bus i2c_bus({portE, portE, pin2, pin3});
 inter_i2c_bus oled_bus({portC, portC, pin1, pin2});
 
-inter_i2c_dev oled_dev(&oled_bus, 0x3C);
 
 /* ── 软串口（测试模式：PA9/PA10，与硬件 debug_uart 同引脚，测试期间禁用硬件） ── */
 soft_uart_port<256> suart({portA, pin9,  // TX
@@ -55,7 +54,7 @@ static const INA228::Config ina228_cfg = {
 } /*  */;
 
 INA228 INA228_2(&i2c_bus, INA228::ADDR_0x40, ina228_cfg);
-oled oled1({&oled_dev, oled::Controller::SSD1306});
+oled oled1(&oled_bus);
 /* ── CAN 总线（CAN1 @ PB12/RX PB13/TX，双板互联 NORMAL 模式） ── */
 [[maybe_unused]] static can_port can_bus({
     .periph = can_id::can1,
@@ -84,6 +83,7 @@ static void xTuserled(void *led_task)
     for (;;)
     {
         user_led.toggle();
+        oled1.print(1, 1, "300", oled::Font::F8x16);
         vTaskDelay(pdMS_TO_TICKS(300));
     }
 }
@@ -94,6 +94,7 @@ static void xTflashled(void *falsh_task)
     for (;;)
     {
         flash_led.toggle();
+        oled1.print(1, 1, "100", oled::Font::F8x16);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
@@ -115,7 +116,9 @@ void function_init(void)
     /* ⚠️ 双板 CAN 实测：仅初始化 CAN，跳过其他自检
      * ⚠️ 本轮验证：启用软 I2C 总线 + INA228 自检（I2C 抽象化上板验证） */
     i2c_bus.init();
+    oled_bus.init();
     // INA228_2.init();   // 自检内部会 reset+init，此处无需重复
+    oled1.init();
 
     user_led.init(mode_output, pulldown, otype_pp, speed_high);
     flash_led.init(mode_output, pulldown, otype_pp, speed_high);
