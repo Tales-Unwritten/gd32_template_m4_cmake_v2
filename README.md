@@ -802,6 +802,12 @@ pacman -S mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
 
 - **远程仓库**：
   - **Gitee**（主仓库）：`origin` → `git@gitee.com:addiction_28/gd32_-template_-m4_-cmake_v2.git`
+  - **GitHub**（镜像）：`github` → `git@github.com:Tales-Unwritten/gd32_template_m4_cmake_v2.git`
+    （<https://github.com/Tales-Unwritten/gd32_template_m4_cmake_v2>）
+- **同步推送**：提交后同时推送主仓库与镜像：
+  ```bash
+  git push origin planB && git push github planB
+  ```
 - **当前开发分支**：`planB`
 - **FreeRTOS 维护说明**：本分支（`planB`）以裸机 + 协议栈重构为主线，FreeRTOS 部分
   仅保留可编译集成；相关内核裁剪、集成与练习内容已迁移到 **`practice`** 分支维护。
